@@ -1,0 +1,16 @@
+import { plannerBot } from '../src/core/bot';
+import { generateLevel } from '../src/core/levelGen';
+import { Simulation } from '../src/core/simulation';
+import { opLabel } from '../src/core/gates';
+const L = Number(process.argv[2] ?? 5);
+const def = generateLevel(L);
+console.log('rows', def.gateRows.map(r => `${r.z.toFixed(0)}:[${r.gates.map(g => g.op.kind==='mystery'?'?':g.op.kind==='cond'?'cond':opLabel(g.op as any)).join(' | ')}]${r.moving?'M':''}`).join('  '));
+console.log('obs', def.obstacles.map(o => `${o.kind}@${o.z.toFixed(0)}`).join(' '));
+console.log('rivals', JSON.stringify(def.rivals), 'finish', JSON.stringify(def.finish));
+const sim = new Simulation(def);
+const orig = sim.step.bind(sim);
+const log: string[] = [];
+(sim as any).step = (dt: number) => { orig(dt); for (const e of (sim as any).events) { if (e.type==='loss') log.push(`z${sim.s.z.toFixed(0)} loss ${e.amount} ${e.cause} -> ${sim.s.count}`); else if (e.type==='gate') log.push(`z${sim.s.z.toFixed(0)} gate ${opLabel(e.op)} ${e.before}->${e.after}`); else if (e.type!=='coin') log.push(`z${sim.s.z.toFixed(0)} ${e.type} ${JSON.stringify(e).slice(0,80)}`);} };
+const r = plannerBot(sim);
+console.log(log.join('\n'));
+console.log(r);
