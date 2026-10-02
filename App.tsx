@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
 import { GameCanvas } from './src/render/GameCanvas';
 import { boot, dprFor, resolveQuality } from './src/state/actions';
 import { app, type ModalId } from './src/state/app';
@@ -19,6 +19,13 @@ import { PauseModal, ResultsModal, ReviveModal, RewardModal, WorldUnlockModal } 
 import { ChestModal, ShopModal, SkinsModal } from './src/ui/screens/StoreModals';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** QA/mockups only: simulate iPhone safe-area insets in web captures (`?insets=59,34`). */
+const DEBUG_INSETS = (() => {
+  if (process.env.EXPO_PUBLIC_DEBUG_HOOKS !== '1') return null;
+  const m = /insets=(\d+),(\d+)/.exec(String(globalThis.location?.search ?? ''));
+  return m ? { top: Number(m[1]), bottom: Number(m[2]), left: 0, right: 0 } : null;
+})();
 
 const MODALS: Record<ModalId, React.ComponentType> = {
   pause: PauseModal,
@@ -59,6 +66,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+      <InsetsOverride>
       <View style={styles.root}>
         <StatusBar style="light" hidden={screen === 'play'} />
         <GameCanvas active={active} dpr={dprFor(quality)} />
@@ -70,8 +78,13 @@ export default function App() {
         <DevAdOverlay />
         <DevPurchaseOverlay />
       </View>
+      </InsetsOverride>
     </SafeAreaProvider>
   );
+}
+
+function InsetsOverride({ children }: { children: React.ReactNode }) {
+  return DEBUG_INSETS ? <SafeAreaInsetsContext.Provider value={DEBUG_INSETS}>{children}</SafeAreaInsetsContext.Provider> : <>{children}</>;
 }
 
 const styles = StyleSheet.create({

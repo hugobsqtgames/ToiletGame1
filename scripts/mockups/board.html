@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Lilita; src: url(LilitaOne_400Regular.ttf); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Lilita, sans-serif; background: #0f1430; }
+.board { width: 3200px; padding: 90px 110px 110px; background: radial-gradient(circle at 20% 0%, #3b6dff 0%, #1d2a7a 45%, #121735 100%); color: #fff; }
+.head { display: flex; align-items: center; gap: 36px; margin-bottom: 70px; }
+.head img { width: 150px; height: 150px; border-radius: 34px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.head h1 { font-size: 104px; letter-spacing: 3px; line-height: 1; text-shadow: 0 8px 0 #1a3fa8; }
+.head p { font-size: 40px; color: #c9d6ff; margin-top: 10px; font-family: system-ui, sans-serif; font-weight: 800; }
+.grid { display: grid; grid-template-columns: repeat(var(--cols, 5), 1fr); gap: 80px 40px; justify-items: center; }
+.cell { display: flex; flex-direction: column; align-items: center; }
+.phone { width: 520px; height: 1090px; border-radius: 86px; background: #0b0b10; padding: 18px; position: relative;
+  box-shadow: 0 0 0 4px #3a3d4a, 0 30px 60px rgba(0,0,0,.55), inset 0 0 0 2px #22242c; }
+.phone::before { content: ''; position: absolute; left: -7px; top: 250px; width: 7px; height: 110px; background: #3a3d4a; border-radius: 4px 0 0 4px; box-shadow: 0 140px 0 #3a3d4a; }
+.screen { width: 100%; height: 100%; border-radius: 70px; overflow: hidden; position: relative; background: #000; }
+.screen img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sbar { position: absolute; top: 0; left: 0; right: 0; height: 100px; z-index: 3; display: flex; justify-content: space-between; align-items: center; padding: 6px 56px 0 64px; color: #fff; font-family: system-ui, -apple-system, sans-serif; font-weight: 700; font-size: 30px; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.sbar i { display: inline-block; width: 46px; height: 22px; border: 3px solid #fff; border-radius: 7px; position: relative; margin-left: 10px; vertical-align: middle; }
+.sbar i::after { content: ''; position: absolute; inset: 2px 8px 2px 2px; background: #fff; border-radius: 3px; }
+.sbar b { display: inline-block; width: 6px; background: #fff; margin-left: 3px; border-radius: 2px; vertical-align: bottom; }
+.island { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 150px; height: 44px; border-radius: 24px; background: #000; z-index: 2; }
+.cap { margin-top: 30px; text-align: center; width: 540px; }
+.num { display: inline-block; background: #ffc83d; color: #1d2340; border-radius: 22px; padding: 4px 18px; font-size: 34px; margin-right: 10px; }
+.title { font-size: 40px; }
+.note { font-family: system-ui, sans-serif; font-weight: 700; font-size: 25px; color: #b8c4ec; margin-top: 8px; line-height: 1.3; }
+.iconcell { width: 520px; height: 1090px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px;
+  border-radius: 86px; background: linear-gradient(160deg, #5fd0ff, #2b6bff); box-shadow: 0 30px 60px rgba(0,0,0,.4); }
+.iconcell img { width: 300px; height: 300px; border-radius: 68px; box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+.iconcell span { font-family: system-ui, sans-serif; font-weight: 700; font-size: 38px; color: #fff; }
+.iconcell small { width: 150px; height: 150px; border-radius: 34px; overflow: hidden; display: block; }
+.iconcell small img { width: 150px; height: 150px; border-radius: 34px; box-shadow: none; }
+.arrow { font-size: 70px; color: #ffc83d; align-self: center; }
+.foot { margin-top: 80px; font-family: system-ui, sans-serif; font-weight: 700; font-size: 28px; color: #9fb0e6; text-align: center; }
+/* hero montage */
+.hero { width: 3600px; height: 2100px; position: relative; overflow: hidden; background: radial-gradient(circle at 50% 30%, #6fd8ff 0%, #2b7bff 40%, #1a2d8f 100%); }
+.hero .rays { position: absolute; inset: -600px; background: repeating-conic-gradient(from 0deg at 50% 45%, rgba(255,255,255,.07) 0 8deg, transparent 8deg 16deg); }
+.hero .ph { position: absolute; }
+.hero .logo { position: absolute; top: 70px; width: 100%; text-align: center; }
+.hero .logo h1 { font-size: 190px; color: #fff; text-shadow: 0 12px 0 #1a3fa8, 0 20px 50px rgba(0,0,0,.35); transform: rotate(-3deg); letter-spacing: 4px; }
+.hero .logo p { font-size: 56px; color: #fff; margin-top: 6px; }
+.hero .label { position: absolute; font-size: 38px; color: #1d2340; background: #fff; border-radius: 26px; padding: 8px 24px; box-shadow: 0 8px 20px rgba(0,0,0,.25); white-space: nowrap; }
+</style></head>
+<body><div id="root"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const page = q.get('page') || 'a';
+const SB = /^(04_|05_|06_|18_|19_|20_|21_|22_|23_|24_|25_|26_|27_|28_)/;
+const sbar = (img) => SB.test(img) ? `<div class="sbar"><span>9:41</span><span><b style="height:10px"></b><b style="height:14px"></b><b style="height:18px"></b><b style="height:22px"></b><i></i></span></div>` : '';
+const phone = (img) => `<div class="phone"><div class="island"></div>${sbar(img)}<div class="screen"><img src="img/${img}.jpg"></div></div>`;
+const cell = (n, title, img, note = '') => `<div class="cell">${img === 'ICON'
+  ? `<div class="iconcell"><img src="img/icon.jpg"><span>Loo Rush</span><div style="display:flex;gap:24px"><small><img src="img/icon.jpg"></small><small><img src="img/icon.jpg" style="filter:grayscale(1) brightness(1.1)"></small></div><span style="font-size:26px;opacity:.85">1024 px · App Store / home screen</span></div>`
+  : phone(img)}<div class="cap"><span class="num">${n}</span><span class="title">${title}</span>${note ? `<div class="note">${note}</div>` : ''}</div></div>`;
+const head = (sub) => `<div class="head"><img src="img/icon.jpg"><div><h1>LOO RUSH</h1><p>${sub}</p></div></div>`;
+const S = [
+  [1, 'App icon', 'ICON', 'Real asset (assets/icon.png)'],
+  [2, 'Splash screen', '02_splash', 'Native splash from app.json'],
+  [3, 'Onboarding', '03_onboarding', 'Level 1 = tutorial: drag hint, NEW! cards'],
+  [4, 'Main menu', '04_home', 'The level itself is the menu background'],
+  [5, 'Worlds', '05_worlds', 'Infinite worlds, remix after world 8'],
+  [6, 'Progression', '06_progression', 'Trophies with infinite tiers'],
+  [7, 'Level start', '07_level_start', 'World, level, optional challenge'],
+  [8, 'Gameplay', '08_gameplay', 'Auto-run, drag to steer'],
+  [9, 'Approaching gates', 'seq03_gates_ahead', ''],
+  [10, 'Choosing a multiplier', 'seq04_gates_labels', '+90 vs x5 vs -9 (real level 86)'],
+  [11, 'Crowd grows', 'seq06_grows', '14 → 70 with x5'],
+  [12, 'Crowd shrinks', '12_shrinks', 'Rival fight: both sides lose runners'],
+  [13, 'Obstacles', '13_obstacles', 'Giant plungers, red ring = danger'],
+  [14, 'Strategic choice', '14_strategy', 'VIP turnstile: 30+ runners for x2'],
+  [15, 'Finish', '15_finish', 'Stall corridor x1 → x10, Royal Throne'],
+  [16, 'Victory', '16_victory', 'Rewarded x3 is optional'],
+  [17, 'Defeat', '17_defeat', 'Consolation coins + tip'],
+  [18, 'Rewards', '18_rewards', ''],
+  [19, 'Daily reward', '19_daily', '7-day loop, streak'],
+  [20, 'Missions', '20_missions', 'Daily / weekly / trophies'],
+  [21, 'Challenges', '21_challenges', 'Daily Challenge + level challenges'],
+  [22, 'Shop', '22_shop', 'Gems (IAP), coins, free coins (ad)'],
+  [23, 'Characters', '23_characters', 'Live 3D preview of the crowd'],
+  [24, 'Skins', '24_skins', '19 skins, legendary Golden Throne'],
+  [25, 'Chests', '25_chests', 'Golden chest: skin + coins + gems'],
+  [26, 'Settings', '26_settings', 'Audio, haptics, FR/EN, graphics, privacy'],
+  [27, 'Remove Ads offer', '27_remove_ads_offer', ''],
+  [28, 'Purchase example', '28_purchase', 'Dev sandbox sheet — store builds show Apple\'s sheet'],
+  [29, 'Rewarded ad', '29_rewarded_ad', 'Dev test ad — store builds show AdMob'],
+  [30, 'New world unlocked', '30_new_world', ''],
+];
+const SEQ = [
+  ['Start: a few runners', 'seq01_start'], ['The crowd runs', 'seq02_advance'], ['Gates ahead', 'seq03_gates_ahead'],
+  ['x5 · +90 · -9', 'seq04_gates_labels'], ['Choosing x5', 'seq05_choose_x5'], ['14 → 70!', 'seq06_grows'],
+  ['Obstacle incoming', 'seq07_obstacle'], ['Dodge!', 'seq08_dodge'], ['New decision: FIGHT', 'seq09_decision'],
+  ['Arrival', 'seq10_arrival'], ['Victory: x5 stall', 'seq11_victory'], ['Reward screen', 'seq12_reward'],
+];
+let html = '';
+if (page === 'a' || page === 'b' || page === 'c') {
+  const part = { a: [0, 10], b: [10, 20], c: [20, 30] }[page];
+  html = `<div class="board">${head(`Final mockups · screens ${part[0] + 1}–${part[1]} · captured from the real app`)}<div class="grid">${S.slice(...part).map((s) => cell(...s)).join('')}</div><div class="foot">All screens are real captures of the finished build (iPhone 1170×2532). Nothing is redrawn.</div></div>`;
+} else if (page === 'seq') {
+  html = `<div class="board" style="width:3700px">${head('Gameplay sequence · real level 86 "Mall Mayhem II" · 12 scenes')}<div class="grid" style="--cols:6">${SEQ.map((s, i) => cell(i + 1, s[0], s[1])).join('')}</div><div class="foot">Captured in sequence from one real run: 9 runners → x5 gate → 70 → plungers → rival fight → 3.2K at the finish → x5 stall → +2.1K coins.</div></div>`;
+} else {
+  const ph = (img, x, y, s, r, label) => `<div class="ph" style="left:${x}px;top:${y}px;transform:scale(${s}) rotate(${r}deg);transform-origin:top left">${phone(img)}</div>`;
+  html = `<div class="hero"><div class="rays"></div><div class="logo"><h1>LOO RUSH</h1><p>Everybody gotta go! · Swipe · Multiply · Rush to the throne</p></div>
+    ${ph('04_home', 90, 560, 1.15, -6, 'Menu')}
+    ${ph('05_worlds', 560, 760, 0.95, -3, 'Worlds')}
+    ${ph('seq04_gates_labels', 1010, 560, 1.15, -1, 'Gates')}
+    ${ph('seq06_grows', 1640, 520, 1.25, 0, 'Gameplay')}
+    ${ph('16_victory', 2280, 560, 1.15, 2, 'Victory')}
+    ${ph('18_rewards', 2800, 760, 0.95, 4, 'Rewards')}
+    ${ph('22_shop', 3180, 600, 0.75, 6, 'Shop')}
+    ${ph('23_characters', -60, 1450, 0.6, -8, '')}
+    ${ph('06_progression', 3330, 1420, 0.55, 8, '')}
+  </div>`;
+}
+document.getElementById('root').innerHTML = html;
+</script></body></html>
