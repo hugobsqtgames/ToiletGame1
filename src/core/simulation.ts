@@ -2,7 +2,7 @@ import { BATTLE, CROWD, LOGIC_MEMBER_CAP, TRACK } from './config';
 import { radiusFor, logicMembers, spacingFor, UNIT_X, UNIT_Z } from './formation';
 import { activeOp, applyOp } from './gates';
 import { clamp } from './math';
-import type { GateOp, LevelDef, ObstacleDef, ObstacleKind } from './types';
+import type { LevelDef, ObstacleDef, ObstacleKind, SimpleGateOp } from './types';
 
 /**
  * Headless, deterministic gameplay simulation. No rendering, no timers:
@@ -19,7 +19,7 @@ export interface Point {
 }
 
 export type SimEvent =
-  | { type: 'gate'; rowId: number; gateIndex: number; op: GateOp; before: number; after: number; x: number; z: number }
+  | { type: 'gate'; rowId: number; gateIndex: number; op: SimpleGateOp; before: number; after: number; x: number; z: number }
   | { type: 'loss'; amount: number; cause: LossCause; points: Point[] }
   | { type: 'gain'; amount: number; x: number; z: number }
   | { type: 'coin'; id: number; amount: number; x: number; z: number }

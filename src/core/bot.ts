@@ -47,7 +47,7 @@ export function plannerBot(sim: Simulation, opts: { horizon?: number; decisionEv
   return { won: sim.s.phase === 'won', finishCount, peak: sim.s.stats.peak, multiplier: mult, timeSec: sim.s.t };
 }
 
-function bestTarget(sim: Simulation, horizon: number): number {
+export function bestTarget(sim: Simulation, horizon: number): number {
   const half = TRACK.width / 2;
   let best = sim.s.targetX;
   let bestScore = -Infinity;
