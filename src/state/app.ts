@@ -52,6 +52,10 @@ export interface AppState {
   /** Bumped when ads/iap availability changes (re-render buttons). */
   storeTick: number;
   lang: string;
+  /** False while the app is backgrounded: the 3D loop is fully stopped. */
+  foreground: boolean;
+  /** Runtime quality downgrade decided by the frame-time monitor (Auto mode only). */
+  qualityOverride: 'low' | 'medium' | null;
 }
 
 export const app = createStore<AppState>({
@@ -67,4 +71,6 @@ export const app = createStore<AppState>({
   busy: false,
   storeTick: 0,
   lang: 'en',
+  foreground: true,
+  qualityOverride: null,
 });

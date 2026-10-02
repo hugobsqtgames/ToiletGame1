@@ -102,7 +102,7 @@ export function ShopModal() {
               <MaterialCommunityIcons name="circle-multiple" size={36} color={colors.gold} />
               <Txt display size={16}>{formatCount(gemPackCoins(p.coinsFactor, save.level))}</Txt>
               <Pressable onPress={() => buyCoinsWithGems(p.id)} style={[s.smallBtn, { backgroundColor: colors.gem, flexDirection: 'row' }]} testID={`buy-${p.id}`}>
-                <GemIcon size={14} />
+                <GemIcon size={14} color="#fff" />
                 <Txt display size={14} color="#fff" style={{ marginLeft: 3 }}>{p.gems}</Txt>
               </Pressable>
             </View>
@@ -155,7 +155,7 @@ export function SkinsModal() {
     action = (
       <GameButton
         label={formatCount(u.price)}
-        icon={<View style={{ marginRight: 6 }}>{u.type === 'coins' ? <CoinIcon size={22} /> : <GemIcon size={24} />}</View>}
+        icon={<View style={{ marginRight: 6 }}>{u.type === 'coins' ? <CoinIcon size={22} /> : <GemIcon size={24} color="#fff" />}</View>}
         size="m"
         color={afford ? (u.type === 'coins' ? colors.gold : colors.gem) : '#9AA4B8'}
         dark={afford ? (u.type === 'coins' ? colors.goldDark : colors.gemDark) : '#6E7891'}

@@ -43,7 +43,8 @@ export default function App() {
   const [fontsLoaded] = useFonts({ LilitaOne_400Regular, Nunito_700Bold, Nunito_800ExtraBold, Nunito_900Black });
   const screen = useStore(app, (s) => s.screen);
   const modal = useStore(app, (s) => s.modal);
-  const quality = useStore(app, (s) => resolveQuality(s.save));
+  const quality = useStore(app, (s) => resolveQuality(s.save, s.qualityOverride));
+  const foreground = useStore(app, (s) => s.foreground);
 
   useEffect(() => {
     if (!fontsLoaded) return;
@@ -52,15 +53,15 @@ export default function App() {
   }, [fontsLoaded]);
 
   const Modal = modal ? MODALS[modal] : null;
-  const active = screen !== 'boot' && !(modal && OPAQUE.includes(modal));
+  const active = foreground && screen !== 'boot' && !(modal && OPAQUE.includes(modal));
 
   return (
     <SafeAreaProvider>
       <View style={styles.root}>
         <StatusBar style="light" hidden={screen === 'play'} />
         <GameCanvas active={active} dpr={dprFor(quality)} />
-        {screen === 'home' ? <HomeScreen /> : null}
-        {screen === 'play' ? <PlayScreen /> : null}
+        {screen === 'home' && modal !== 'skins' ? <HomeScreen /> : null}
+        {screen === 'play' && modal !== 'skins' ? <PlayScreen /> : null}
         {Modal ? <Modal /> : null}
         {screen === 'boot' || !fontsLoaded ? <BootScreen /> : null}
         <ToastHost />

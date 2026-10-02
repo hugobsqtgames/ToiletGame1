@@ -14,20 +14,22 @@ interface MissionTemplate {
   target: (level: number) => number;
   /** 'max' metrics track the best single run; 'sum' accumulate. */
   mode: 'sum' | 'max';
+  /** Only offered once the player can actually do it. */
+  minLevel?: number;
 }
 
 const DAILY_POOL: MissionTemplate[] = [
   { metric: 'runs', target: () => 5, mode: 'sum' },
   { metric: 'wins', target: () => 3, mode: 'sum' },
   { metric: 'multipliers', target: () => 8, mode: 'sum' },
-  { metric: 'bigMultipliers', target: () => 3, mode: 'sum' },
   { metric: 'peakCrowd', target: (l) => niceRound(60 + l * 8), mode: 'max' },
   { metric: 'finishCrowd', target: (l) => niceRound(40 + l * 5), mode: 'max' },
   { metric: 'coinsEarned', target: (l) => niceRound(300 + l * 25), mode: 'sum' },
   { metric: 'gates', target: () => 20, mode: 'sum' },
-  { metric: 'stragglers', target: (l) => niceRound(30 + l * 2), mode: 'sum' },
-  { metric: 'rivalsDefeated', target: () => 2, mode: 'sum' },
-  { metric: 'perfect', target: () => 1, mode: 'sum' },
+  { metric: 'stragglers', target: (l) => niceRound(30 + l * 2), mode: 'sum', minLevel: 4 },
+  { metric: 'rivalsDefeated', target: () => 2, mode: 'sum', minLevel: 12 },
+  { metric: 'perfect', target: () => 1, mode: 'sum', minLevel: 3 },
+  { metric: 'bigMultipliers', target: () => 3, mode: 'sum', minLevel: 3 },
 ];
 
 const WEEKLY_POOL: MissionTemplate[] = [
@@ -35,9 +37,9 @@ const WEEKLY_POOL: MissionTemplate[] = [
   { metric: 'bigMultipliers', target: () => 20, mode: 'sum' },
   { metric: 'people', target: (l) => niceRound(3000 + l * 120), mode: 'sum' },
   { metric: 'coinsEarned', target: (l) => niceRound(3000 + l * 200), mode: 'sum' },
-  { metric: 'rivalsDefeated', target: () => 12, mode: 'sum' },
+  { metric: 'rivalsDefeated', target: () => 12, mode: 'sum', minLevel: 12 },
   { metric: 'chestsOpened', target: () => 4, mode: 'sum' },
-  { metric: 'challenges', target: () => 4, mode: 'sum' },
+  { metric: 'challenges', target: () => 4, mode: 'sum', minLevel: 5 },
   { metric: 'topStall', target: () => 3, mode: 'sum' },
 ];
 
@@ -45,7 +47,7 @@ export const MAX_METRICS: MetricId[] = ['peakCrowd', 'finishCrowd'];
 
 function build(pool: MissionTemplate[], seed: number, level: number, prefix: string, weekly: boolean): MissionState[] {
   const rng = new Rng(seed);
-  const picks = rng.shuffle([...pool]).slice(0, 3);
+  const picks = rng.shuffle(pool.filter((t) => (t.minLevel ?? 0) <= level)).slice(0, 3);
   return picks.map((t, i) => {
     const reward: Reward = weekly
       ? i === 2 ? { gems: 15, chest: 'basic' } : { gems: 8 + i * 2, coins: niceRound(200 + level * 20) }

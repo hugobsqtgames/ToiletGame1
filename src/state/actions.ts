@@ -56,10 +56,11 @@ export function toast(text: string, tone: 'info' | 'good' | 'bad' = 'info') {
 
 /* ---------------- quality ---------------- */
 
-export function resolveQuality(s: SaveData): QualityTier {
+export function resolveQuality(s: SaveData, override: 'low' | 'medium' | null = app.get().qualityOverride): QualityTier {
   if (s.settings.quality !== 'auto') return s.settings.quality;
-  if (Platform.OS === 'web') return 'medium';
-  return PixelRatio.get() >= 3 ? 'high' : 'medium';
+  const base: QualityTier = Platform.OS === 'web' ? 'medium' : PixelRatio.get() >= 3 ? 'high' : 'medium';
+  if (override === 'low' || (override === 'medium' && base === 'high')) return override;
+  return base;
 }
 
 export function dprFor(q: QualityTier): number {
@@ -92,6 +93,16 @@ export async function boot() {
   if (source === 'backup' || source === 'recovered-default') log.warn('save recovered from', source);
 
   game.setCallbacks({ onEnd: onRunEnd });
+  game.onSlowFrames = () => {
+    const st = app.get();
+    if (st.save.settings.quality !== 'auto') return;
+    const cur = resolveQuality(st.save);
+    if (cur === 'low') return;
+    const next = cur === 'high' ? 'medium' : 'low';
+    log.info('auto quality downgrade to', next);
+    app.set({ qualityOverride: next });
+    game.setQuality(next);
+  };
   game.setSkin(skinById(save.skins.selected));
   loadMenuLevel();
   game.setCameraMode('menu');
@@ -124,6 +135,7 @@ export async function boot() {
 }
 
 function onAppState(state: string) {
+  app.set({ foreground: state === 'active' });
   if (state === 'active') {
     audio.setSuspended(false);
     const s = refreshMissions(app.get().save, now());

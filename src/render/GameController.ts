@@ -218,8 +218,22 @@ export class GameController {
 
   /* ---------------- frame ---------------- */
 
+  /** Called when frames stay slow (auto quality can step down). */
+  onSlowFrames: (() => void) | null = null;
+  private slowTime = 0;
+  private frameAvg = 1 / 60;
+
   frame(dtRaw: number) {
     if (!this.camera || !this.rig) return;
+    // Frame-time monitor (ignores hitches > 0.25s such as resume from background).
+    if (dtRaw < 0.25) {
+      this.frameAvg += (dtRaw - this.frameAvg) * 0.05;
+      this.slowTime = this.frameAvg > 1 / 38 ? this.slowTime + dtRaw : 0;
+      if (this.slowTime > 4) {
+        this.slowTime = -20; // give the new tier time before re-evaluating
+        this.onSlowFrames?.();
+      }
+    }
     const dt = Math.min(0.05, Math.max(0, dtRaw));
     const sim = this.sim;
     if (!sim || !this.crowd || !this.level) {

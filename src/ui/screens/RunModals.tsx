@@ -89,7 +89,7 @@ export function ReviveModal() {
         {gems >= REVIVE_GEMS ? (
           <GameButton
             label={t('reviveGems', { n: REVIVE_GEMS })}
-            icon={<View style={{ marginRight: 6 }}><GemIcon size={22} /></View>}
+            icon={<View style={{ marginRight: 6 }}><GemIcon size={22} color="#fff" /></View>}
             size="m"
             color={colors.gem}
             dark={colors.gemDark}

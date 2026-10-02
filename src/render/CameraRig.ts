@@ -67,8 +67,9 @@ export class CameraRig {
         _look.set(x - 0.15, 0.85 + R * 0.15, wzc);
         break;
       case 'showcase':
-        _target.set(x + 0.9, 1.25, wzc - 3.0);
-        _look.set(x + 0.9, 0.75, wzc);
+        // Crowd framed in the upper half (the skins sheet covers the bottom).
+        _target.set(x + 0.5, 1.5 + R * 0.4, wzc - 3.2 - R * 1.2);
+        _look.set(x + 0.1, -0.9, wzc + 0.4);
         break;
       case 'play':
         _target.set(x * 0.55, 7.2 + R * 1.25, wzc + 8.6 + R * 1.5);

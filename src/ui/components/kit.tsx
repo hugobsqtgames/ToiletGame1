@@ -161,8 +161,8 @@ export function CoinIcon({ size = 22 }: { size?: number }) {
   );
 }
 
-export function GemIcon({ size = 22 }: { size?: number }) {
-  return <MaterialCommunityIcons name="diamond-stone" size={size} color={colors.gem} />;
+export function GemIcon({ size = 22, color = colors.gem }: { size?: number; color?: string }) {
+  return <MaterialCommunityIcons name="diamond-stone" size={size} color={color} />;
 }
 
 export function KeyIcon({ size = 20 }: { size?: number }) {
