@@ -66,6 +66,8 @@ export class GameController {
   private quality: QualityTier = 'high';
   /** Debug/QA only: lets the planner bot steer (screenshots, soak tests). */
   autoplay = false;
+  /** Debug/QA only: stops the simulation while rendering continues (screenshots). */
+  debugFreeze = false;
   private autoplayTimer = 0;
 
   constructor() {
@@ -246,7 +248,7 @@ export class GameController {
         sim.setTarget(bestTarget(sim, 1.6));
       }
     }
-    if (!this.paused) {
+    if (!this.paused && !this.debugFreeze) {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= SIM.fixedDt && steps < SIM.maxStepsPerFrame) {
@@ -452,13 +454,13 @@ export class GameController {
   }
 
   /** QA only: simulates `seconds` of gameplay instantly (autoplay steering). */
-  debugFastForward(seconds: number) {
+  debugFastForward(seconds: number, steerX?: number) {
     const sim = this.sim;
     if (!sim) return;
     if (sim.s.phase === 'ready') this.startRun();
     const steps = Math.round(seconds / SIM.fixedDt);
     for (let i = 0; i < steps && !sim.finished; i++) {
-      if (sim.s.phase === 'running' && i % 9 === 0) sim.setTarget(bestTarget(sim, 1.6));
+      if (sim.s.phase === 'running' && i % 9 === 0) sim.setTarget(steerX ?? bestTarget(sim, 1.6));
       sim.step(SIM.fixedDt);
       for (const e of sim.drainEvents()) this.handle(e, sim);
     }

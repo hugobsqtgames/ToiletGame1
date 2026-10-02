@@ -163,3 +163,24 @@ describe('finish corridor', () => {
     }
   });
 });
+
+describe('rivals', () => {
+  it('cannot be dodged: every rival crowd leads to a fight', () => {
+    let rivals = 0;
+    let battles = 0;
+    for (let L = 11; L < 31; L++) {
+      const def = generateLevel(L);
+      const sim = new Simulation(def);
+      const step = sim.step.bind(sim);
+      sim.step = (dt: number) => {
+        const before = sim.s.phase;
+        step(dt);
+        if (before !== 'battle' && sim.s.phase === 'battle') battles++;
+      };
+      const r = plannerBot(sim);
+      // A lost run may end before later rivals are reached.
+      rivals += r.won ? def.rivals.length : 0;
+    }
+    expect(battles).toBeGreaterThanOrEqual(rivals);
+  });
+});

@@ -95,6 +95,8 @@ const STALL_SPACING = 4;
 const STALL_OFFSET = 5;
 const ROLLER_ACTIVATION = 34;
 export const RIVAL_TRIGGER = 15;
+/** Lateral chase speed of rivals: fast enough that a fight cannot be dodged. */
+const RIVAL_CHASE = 14;
 /** Seconds without losses before holes in the crowd close up. */
 const COMPACT_DELAY = 0.45;
 
@@ -530,7 +532,7 @@ export class Simulation {
       }
       r.charging = true;
       // Rivals run at the player: unavoidable but readable.
-      r.x += clamp(s.x - r.x, -5 * dt, 5 * dt);
+      r.x += clamp(s.x - r.x, -RIVAL_CHASE * dt, RIVAL_CHASE * dt);
       r.z -= 3.5 * dt;
       const rr = rivalRadius(r.count);
       const ddx = r.x - s.x;

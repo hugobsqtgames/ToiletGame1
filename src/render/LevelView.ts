@@ -140,14 +140,14 @@ export class LevelView extends THREE.Group {
         const prop = props[(k + (side > 0 ? 1 : 0)) % props.length];
         const x = side * (HALF + 2.4 + ((k * 7) % 3) * 0.4);
         const rotY = side > 0 ? Math.PI : 0;
-        const c = Math.cos(rotY);
         for (const p of prop) {
           const px = p.pos?.[0] ?? 0;
           const pz = p.pos?.[2] ?? 0;
           out.push({
             geo: p.geo,
             color: p.color,
-            pos: [x + px * c, p.pos?.[1] ?? 0, wz(z) + pz * c],
+            // Prop-local +x points away from the track on both sides.
+            pos: [x + px * side, p.pos?.[1] ?? 0, wz(z) + pz],
             rot: [p.rot?.[0] ?? 0, (p.rot?.[1] ?? 0) + rotY, p.rot?.[2] ?? 0],
             scale: p.scale,
           });
@@ -541,7 +541,10 @@ export class LevelView extends THREE.Group {
           if (p.gateIndex === g.taken) {
             p.mat.color.copy(p.base).lerp(WHITE, 0.8 * (1 - g.anim));
             p.mat.opacity = 0.68 * (1 - g.anim * 0.7);
-            p.label.scale.setScalar(1 + g.anim * 0.4);
+            // Pop then vanish: the passed gate must not loom in front of the camera.
+            const k = g.anim < 0.3 ? 1 + g.anim : Math.max(0.001, 1.3 * (1 - (g.anim - 0.3) / 0.7));
+            p.label.scale.setScalar(k);
+            if (p.small) p.small.scale.setScalar(k);
           } else {
             const s = Math.max(0.001, 1 - g.anim);
             p.mesh.scale.set(1, s, 1);
