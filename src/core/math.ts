@@ -1,7 +1,5 @@
 export const clamp = (v: number, min: number, max: number) => (v < min ? min : v > max ? max : v);
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-export const invLerp = (a: number, b: number, v: number) => (b === a ? 0 : clamp((v - a) / (b - a), 0, 1));
-export const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
 /** Frame-rate independent exponential smoothing factor. */
 export const damp = (lambda: number, dt: number) => 1 - Math.exp(-lambda * dt);

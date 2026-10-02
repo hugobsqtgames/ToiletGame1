@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
+import { useAnimatedValue } from '../hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerDevAdPresenter, type DevAdRequest } from '../../services/ads/devSim';
 import { app } from '../../state/app';
@@ -49,7 +50,7 @@ export function DevAdOverlay() {
 export function ToastHost() {
   const toast = useStore(app, (s) => s.toast);
   const insets = useSafeAreaInsets();
-  const a = useRef(new Animated.Value(0)).current;
+  const a = useAnimatedValue(0);
   useEffect(() => {
     if (!toast) return;
     a.setValue(0);

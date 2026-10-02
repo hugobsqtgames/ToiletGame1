@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { useAnimatedValue } from '../hooks';
 import { formatCount } from '../../core/format';
 import { getWorld } from '../../core/worlds';
 import { CHEST_WINS, REVIVE_GEMS } from '../../meta/economy';
@@ -53,10 +54,13 @@ export function ReviveModal() {
   useStore(app, (s) => s.storeTick);
   const [left, setLeft] = useState(REVIVE_SECONDS);
   const [busy, setBusy] = useState(false);
-  const ring = useRef(new Animated.Value(1)).current;
+  const ring = useAnimatedValue(1);
   useEffect(() => {
     Animated.timing(ring, { toValue: 0, duration: REVIVE_SECONDS * 1000, easing: Easing.linear, useNativeDriver: false }).start();
-    const id = setInterval(() => setLeft((x) => x - 1), 1000);
+    // The countdown freezes while the app is in background (never auto-decline unseen).
+    const id = setInterval(() => {
+      if (app.get().foreground) setLeft((x) => x - 1);
+    }, 1000);
     return () => clearInterval(id);
   }, [ring]);
   useEffect(() => {
@@ -112,7 +116,7 @@ export function ResultsModal() {
   const results = useStore(app, (s) => s.results);
   const save = useStore(app, (s) => s.save);
   useStore(app, (s) => s.storeTick);
-  const pop = useRef(new Animated.Value(0)).current;
+  const pop = useAnimatedValue(0);
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 8, bounciness: 14 }).start();
   }, [pop]);
@@ -242,7 +246,7 @@ export function WorldUnlockModal() {
   const results = useStore(app, (s) => s.results);
   const w = getWorld(Math.floor((level - 1) / 10) + 1);
   const lang = getLanguage();
-  const spin = useRef(new Animated.Value(0)).current;
+  const spin = useAnimatedValue(0);
   useEffect(() => {
     audio.play('unlock');
     const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true }));

@@ -42,7 +42,6 @@ export const freeCoinsAmount = (level: number) => niceRound(60 + levelBase(level
 export const GEM_COIN_PACKS = [
   { id: 'coins_s', gems: 20, coinsFactor: 12 },
   { id: 'coins_m', gems: 60, coinsFactor: 40 },
-  { id: 'coins_l', gems: 150, coinsFactor: 110 },
 ] as const;
 export const gemPackCoins = (factor: number, level: number) => niceRound(factor * levelBase(level) * 2);
 

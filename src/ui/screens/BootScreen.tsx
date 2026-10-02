@@ -1,13 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet } from 'react-native';
-import { Text } from 'react-native';
+import React, { useEffect } from 'react';
+import { Animated, Easing, StyleSheet, Text } from 'react-native';
+import { useAnimatedValue } from '../hooks';
 import { t } from '../i18n';
 
 /** Animated in-app splash shown while the save loads (continues the native splash). */
 export function BootScreen() {
-  const v = useRef(new Animated.Value(0)).current;
+  const v = useAnimatedValue(0);
   useEffect(() => {
     const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
     loop.start();

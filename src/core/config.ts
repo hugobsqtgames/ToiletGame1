@@ -23,11 +23,7 @@ export const CROWD = {
   reviveGrace: 2.2,
 };
 
-/** Visual cap of rendered members by quality tier. */
-export const VISUAL_CAP = { low: 140, medium: 220, high: 320 } as const;
-export type Quality = keyof typeof VISUAL_CAP;
-
-/** Logic member cap (deterministic, independent from rendering quality). */
+/** Simulated/rendered member cap (deterministic, independent from rendering quality). */
 export const LOGIC_MEMBER_CAP = 220;
 
 export const BATTLE = {

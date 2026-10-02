@@ -10,7 +10,7 @@ import { characterGeometry, STRAGGLER_LOOK } from './characters';
 import { CrowdView } from './CrowdView';
 import { themeProps, toiletProp } from './decor';
 import { disposeObject, mergeParts, skyDome, type Part } from './geo';
-import { VoxelLabel } from './voxelFont';
+import { bakeText, VoxelLabel } from './voxelFont';
 
 const HALF = TRACK.width / 2;
 export const GATE_COLORS: Record<GateTone, string> = { good: '#2FA8FF', bad: '#FF4D5E', mystery: '#A66BFF', cond: '#FFB020' };
@@ -52,7 +52,7 @@ export class LevelView extends THREE.Group {
   private coinIds: number[] = [];
   private coinHidden = new Set<number>();
   private breakables = new Map<number, THREE.Object3D>();
-  private turnstiles: { o: ObstacleDef; label: VoxelLabel; mat: THREE.MeshBasicMaterial; arms: THREE.Object3D }[] = [];
+  private turnstiles: { o: ObstacleDef; label: THREE.Object3D; mat: THREE.MeshBasicMaterial; arms: THREE.Object3D }[] = [];
   private labelMat: THREE.MeshBasicMaterial;
   private darkLabelMat: THREE.MeshBasicMaterial;
   private lambert: THREE.MeshLambertMaterial;
@@ -126,8 +126,7 @@ export class LevelView extends THREE.Group {
     // Start arch
     for (const sx of [-1, 1]) out.push({ geo: B(0.5, 3.6, 0.5), color: this.colors.accent, pos: [sx * (HALF + 0.3), 1.8, wz(2)] });
     out.push({ geo: B(TRACK.width + 1.1, 0.7, 0.5), color: this.colors.accent, pos: [0, 3.6, wz(2)] });
-    const startLabel = new VoxelLabel(this.labelMat, 0.075, 5);
-    startLabel.setText('START');
+    const startLabel = bakeText('START', this.labelMat, 0.075);
     startLabel.position.set(0, 3.6, wz(2) + 0.3);
     this.add(startLabel);
   }
@@ -136,7 +135,7 @@ export class LevelView extends THREE.Group {
     const props = themeProps(kind, this.colors);
     const end = this.def.finish.z + TRACK.finishLength;
     let k = 0;
-    for (let z = -20; z < end; z += 9, k++) {
+    for (let z = -20; z < end; z += 10, k++) {
       for (const side of [-1, 1]) {
         const prop = props[(k + (side > 0 ? 1 : 0)) % props.length];
         const x = side * (HALF + 2.4 + ((k * 7) % 3) * 0.4);
@@ -146,7 +145,7 @@ export class LevelView extends THREE.Group {
           const px = p.pos?.[0] ?? 0;
           const pz = p.pos?.[2] ?? 0;
           out.push({
-            geo: p.geo.clone(),
+            geo: p.geo,
             color: p.color,
             pos: [x + px * c, p.pos?.[1] ?? 0, wz(z) + pz * c],
             rot: [p.rot?.[0] ?? 0, (p.rot?.[1] ?? 0) + rotY, p.rot?.[2] ?? 0],
@@ -171,8 +170,7 @@ export class LevelView extends THREE.Group {
     }
     for (const sx of [-1, 1]) out.push({ geo: B(0.5, 4.2, 0.5), color: '#FFD54F', pos: [sx * (HALF + 0.3), 2.1, zLine] });
     out.push({ geo: B(TRACK.width + 1.1, 0.9, 0.5), color: '#FFD54F', pos: [0, 4.2, zLine] });
-    const fl = new VoxelLabel(this.darkLabelMat, 0.09, 6);
-    fl.setText('FINISH');
+    const fl = bakeText('FINISH', this.darkLabelMat, 0.09);
     fl.position.set(0, 4.2, zLine + 0.3);
     this.add(fl);
 
@@ -192,8 +190,7 @@ export class LevelView extends THREE.Group {
       // Multiplier signs sit on the roof edge of each cubicle, facing the camera.
       const text = 'x' + (Number.isInteger(m) ? m : m.toFixed(1));
       for (const side of [-1, 1]) {
-        const lab = new VoxelLabel(this.labelMat, 0.075, 5);
-        lab.setText(text);
+        const lab = bakeText(text, this.labelMat, 0.075);
         lab.position.set(side * (HALF - 1.1), 2.95, z + 1.68);
         this.add(lab);
         out.push({ geo: B(2.1, 0.75, 0.12), color: '#1D2340', pos: [side * (HALF - 1.1), 2.95, z + 1.55] });
@@ -425,8 +422,7 @@ export class LevelView extends THREE.Group {
         const mesh = new THREE.Mesh(mergeParts(parts), this.lambert);
         for (const p of parts) p.geo.dispose();
         g.add(mesh);
-        const lab = new VoxelLabel(new THREE.MeshBasicMaterial({ color: '#FF4D5E' }), 0.08, 5);
-        lab.setText('-' + formatCount(o.hp ?? 0));
+        const lab = bakeText('-' + formatCount(o.hp ?? 0), new THREE.MeshBasicMaterial({ color: '#FF4D5E' }), 0.08);
         lab.position.set(0, 1.75, 0);
         g.add(lab);
         this.add(g);
@@ -443,8 +439,7 @@ export class LevelView extends THREE.Group {
         arms.add(mesh);
         this.add(arms);
         const mat = new THREE.MeshBasicMaterial({ color: '#FF4D5E' });
-        const label = new VoxelLabel(mat, 0.1, 6);
-        label.setText(formatCount(o.hp ?? 0) + '+');
+        const label = bakeText(formatCount(o.hp ?? 0) + '+', mat, 0.1);
         label.position.set(o.x, 2.0, z);
         this.add(label);
         out.push({ geo: B(o.w * 2, 0.85, 0.12), color: '#263238', pos: [o.x, 2.0, z - 0.1] });
@@ -485,8 +480,7 @@ export class LevelView extends THREE.Group {
         parts.push({ geo: C(0.95, 0.95, 0.06, 20), color: '#FFFFFF', pos: [0, 0.03, 0] });
         const mesh = new THREE.Mesh(mergeParts(parts), this.lambert);
         g.add(mesh);
-        const lab = new VoxelLabel(new THREE.MeshBasicMaterial({ color: '#2BD47D' }), 0.085, 6);
-        lab.setText('+' + formatCount(p.amount));
+        const lab = bakeText('+' + formatCount(p.amount), new THREE.MeshBasicMaterial({ color: '#2BD47D' }), 0.085);
         lab.position.set(0, 1.35, 0);
         g.add(lab);
         this.add(g);
@@ -579,6 +573,12 @@ export class LevelView extends THREE.Group {
       if (!v) continue;
       const alive = rs.count > 0 && !rs.defeated;
       v.view.visible = alive || v.view.visibleCount > 0;
+      // Far away (in the fog) or gone: skip the per-member animation work.
+      const far = rs.z - sim.s.z > 70;
+      if (!v.view.visible || (far && v.view.visibleCount > 0)) {
+        v.pill.visible = v.label.visible = alive && !far;
+        continue;
+      }
       v.view.position.set(rs.x, 0, wz(rs.z));
       v.view.mode = sim.s.phase === 'battle' && sim.s.rivals[sim.s.activeRival] === rs ? 'fight' : rs.charging ? 'run' : 'idle';
       const m = alive ? Math.min(220, rs.count) : 0;

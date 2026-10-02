@@ -165,3 +165,26 @@ describe('iap entitlements', () => {
     expect(grantPurchase(s, 'unknown', 't9').granted).toBe(false);
   });
 });
+
+describe('audit regressions', () => {
+  it('missions cannot be farmed by rolling the clock back', () => {
+    let s = refreshMissions(defaultSave(NOW), NOW);
+    const today = s.missions.dailyKey;
+    s = { ...s, missions: { ...s.missions, daily: s.missions.daily.map((m) => ({ ...m, claimed: true })) } };
+    const back = refreshMissions(s, NOW - 2 * DAY);
+    expect(back.missions.dailyKey).toBe(today);
+    expect(back.missions.daily.every((m) => m.claimed)).toBe(true);
+    const next = refreshMissions(s, NOW + DAY);
+    expect(next.missions.dailyKey).not.toBe(today);
+  });
+  it('new players never get missions they cannot complete yet', () => {
+    for (let d = 0; d < 60; d++) {
+      const s = refreshMissions(defaultSave(NOW), NOW + d * DAY);
+      expect(s.missions.daily.some((m) => m.metric === 'rivalsDefeated')).toBe(false);
+    }
+  });
+  it('keeps real timestamps through a save round-trip', () => {
+    const s = { ...defaultSave(NOW), ads: { ...defaultSave(NOW).ads, lastInterstitialAt: NOW } };
+    expect(decodeSave(encodeSave(s), NOW)!.ads.lastInterstitialAt).toBe(NOW);
+  });
+});

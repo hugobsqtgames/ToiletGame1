@@ -197,6 +197,7 @@ export const fr: Dict = {
   resetConfirm: 'Effacer toute la progression ? Les achats pourront être restaurés.',
   version: 'Version {v}',
   credits: 'Fait avec amour, des ventouses et Expo.',
+  adUnavailable: 'Aucune pub disponible pour le moment. Réessaie plus tard.',
   testAd: 'PUB DE TEST',
   testAdDesc: 'Pub simulée (version de développement uniquement). Les vraies pubs apparaissent dans la version App Store.',
   testAdSkip: 'Fermer',

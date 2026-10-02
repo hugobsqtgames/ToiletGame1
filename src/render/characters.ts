@@ -27,7 +27,7 @@ export const HIP_X = 0.055;
 
 const S = (r: number, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
 const C = (rt: number, rb: number, h: number, seg = 10) => new THREE.CylinderGeometry(rt, rb, h, seg);
-const CAP = (r: number, l: number) => new THREE.CapsuleGeometry(r, l, 3, 8);
+const CAP = (r: number, l: number, cap = 3, radial = 8) => new THREE.CapsuleGeometry(r, l, cap, radial);
 const B = (x: number, y: number, z: number) => new THREE.BoxGeometry(x, y, z);
 const T = (r: number, t: number) => new THREE.TorusGeometry(r, t, 6, 14);
 
@@ -118,24 +118,24 @@ export function characterGeometry(key: string, look: Look): CharacterGeometry {
     // Belt / shorts top
     { geo: C(0.118, 0.118, 0.04, 12), color: look.legs, pos: [0, 0.2, 0] },
     // Head
-    { geo: S(0.125, 12, 10), color: look.skin, pos: [0, headY, 0] },
+    { geo: S(0.125, 11, 8), color: look.skin, pos: [0, headY, 0] },
     // Googly eyes (whites + pupils looking in different directions = goofy)
-    { geo: S(0.045, 8, 6), color: '#FFFFFF', pos: [-0.05, headY + 0.03, -0.095] },
-    { geo: S(0.045, 8, 6), color: '#FFFFFF', pos: [0.05, headY + 0.03, -0.095] },
-    { geo: S(0.022, 6, 4), color: '#151515', pos: [-0.055, headY + 0.045, -0.135] },
-    { geo: S(0.022, 6, 4), color: '#151515', pos: [0.058, headY + 0.015, -0.135] },
+    { geo: S(0.045, 7, 5), color: '#FFFFFF', pos: [-0.05, headY + 0.03, -0.095] },
+    { geo: S(0.045, 7, 5), color: '#FFFFFF', pos: [0.05, headY + 0.03, -0.095] },
+    { geo: S(0.022, 5, 3), color: '#151515', pos: [-0.055, headY + 0.045, -0.135] },
+    { geo: S(0.022, 5, 3), color: '#151515', pos: [0.058, headY + 0.015, -0.135] },
     // Worried "O" mouth
     { geo: S(0.026, 6, 4), color: '#5A1E1E', pos: [0, headY - 0.06, -0.112], scale: [1, 1.2, 0.5] },
     // Arms up in panic
-    { geo: CAP(0.03, 0.12), color: look.body, pos: [-0.15, 0.42, 0], rot: [0, 0, 0.6] },
-    { geo: CAP(0.03, 0.12), color: look.body, pos: [0.15, 0.42, 0], rot: [0, 0, -0.6] },
-    { geo: S(0.038, 6, 4), color: look.skin, pos: [-0.205, 0.5, 0] },
-    { geo: S(0.038, 6, 4), color: look.skin, pos: [0.205, 0.5, 0] },
+    { geo: CAP(0.03, 0.12, 1, 5), color: look.body, pos: [-0.15, 0.42, 0], rot: [0, 0, 0.6] },
+    { geo: CAP(0.03, 0.12, 1, 5), color: look.body, pos: [0.15, 0.42, 0], rot: [0, 0, -0.6] },
+    { geo: S(0.038, 5, 4), color: look.skin, pos: [-0.205, 0.5, 0] },
+    { geo: S(0.038, 5, 4), color: look.skin, pos: [0.205, 0.5, 0] },
     ...accessoryParts(look.accessory, look.accColor),
   ];
   const upper = mergeParts(parts);
   const leg = mergeParts([
-    { geo: CAP(0.045, 0.08), color: look.legs, pos: [0, -0.07, 0] },
+    { geo: CAP(0.045, 0.08, 2, 6), color: look.legs, pos: [0, -0.07, 0] },
     { geo: B(0.07, 0.04, 0.1), color: '#2A2A2A', pos: [0, -0.15, -0.02] },
   ]);
   upper.userData.shared = true;

@@ -18,22 +18,30 @@ const tmpQ = new THREE.Quaternion();
 const tmpE = new THREE.Euler();
 const tmpP = new THREE.Vector3();
 const tmpS = new THREE.Vector3();
-const tmpN = new THREE.Matrix3();
 const tmpC = new THREE.Color();
 
-/** Merges parts into one non-indexed geometry with a `color` attribute. */
+/**
+ * Merges parts into one INDEXED geometry with a `color` attribute.
+ * Keeping index buffers means shared vertices are processed once by the GPU
+ * (3-4x fewer vertex shader invocations than non-indexed triangles).
+ */
 export function mergeParts(parts: Part[]): THREE.BufferGeometry {
-  let count = 0;
+  let vCount = 0;
+  let iCount = 0;
   const prepared = parts.map((p) => {
-    const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
+    const g = p.geo.clone();
     if (!g.getAttribute('normal')) g.computeVertexNormals();
-    count += g.getAttribute('position').count;
+    const n = g.getAttribute('position').count;
+    vCount += n;
+    iCount += g.index ? g.index.count : n;
     return { p, g };
   });
-  const pos = new Float32Array(count * 3);
-  const nor = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
+  const pos = new Float32Array(vCount * 3);
+  const nor = new Float32Array(vCount * 3);
+  const col = new Float32Array(vCount * 3);
+  const idx = vCount > 65535 ? new Uint32Array(iCount) : new Uint16Array(iCount);
   let o = 0;
+  let io = 0;
   for (const { p, g } of prepared) {
     tmpE.set(...(p.rot ?? [0, 0, 0]));
     tmpQ.setFromEuler(tmpE);
@@ -41,11 +49,17 @@ export function mergeParts(parts: Part[]): THREE.BufferGeometry {
     tmpS.set(...(p.scale ?? [1, 1, 1]));
     tmpM.compose(tmpP, tmpQ, tmpS);
     g.applyMatrix4(tmpM);
-    tmpN.getNormalMatrix(tmpM);
     if (p.color !== null) tmpC.set(p.color);
     const gc = p.color === null ? g.getAttribute('color') : null;
     const gp = g.getAttribute('position');
     const gn = g.getAttribute('normal');
+    const base = o;
+    if (g.index) {
+      const gi = g.index;
+      for (let k = 0; k < gi.count; k++) idx[io++] = gi.getX(k) + base;
+    } else {
+      for (let k = 0; k < gp.count; k++) idx[io++] = base + k;
+    }
     for (let i = 0; i < gp.count; i++, o++) {
       pos[o * 3] = gp.getX(i);
       pos[o * 3 + 1] = gp.getY(i);
@@ -69,6 +83,7 @@ export function mergeParts(parts: Part[]): THREE.BufferGeometry {
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
   out.computeBoundingSphere();
   return out;
 }
@@ -113,6 +128,8 @@ export function skyDome(top: string, bottom: string): THREE.Mesh {
 
 export function disposeObject(root: THREE.Object3D, keep?: Set<unknown>) {
   root.traverse((o) => {
+    // Instanced meshes own GPU buffers outside their geometry (instanceMatrix/color).
+    if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     const m = o as THREE.Mesh;
     if (m.geometry && !m.geometry.userData.shared && !keep?.has(m.geometry)) m.geometry.dispose();
     const mat = m.material as THREE.Material | THREE.Material[] | undefined;

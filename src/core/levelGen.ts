@@ -168,7 +168,7 @@ export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
 /* Patterns                                                            */
 /* ------------------------------------------------------------------ */
 
-function use(g: Gen, ...m: MechanicId[]) {
+function markUsed(g: Gen, ...m: MechanicId[]) {
   for (const x of m) g.used.add(x);
 }
 
@@ -189,7 +189,7 @@ function lowRow(options: GateOption[], E: number) {
 function obstacle(g: Gen, kind: ObstacleKind, o: Omit<ObstacleDef, 'id' | 'kind'>): ObstacleDef {
   const def: ObstacleDef = { id: g.nextId++, kind, ...o };
   g.obstacles.push(def);
-  use(g, kind as MechanicId);
+  markUsed(g, kind as MechanicId);
   return def;
 }
 
@@ -235,8 +235,8 @@ function gateRowPattern(g: Gen, o: { gentle?: boolean; forced?: DilemmaKind }) {
     ? { amp: 1.3, freq: g.rng.range(0.9, 1.5) * Math.sqrt(g.P.motion) }
     : undefined;
   rowFromOptions(g, d.options, g.z, moving);
-  use(g, ...d.mechanics);
-  if (moving) use(g, 'gate_moving');
+  markUsed(g, ...d.mechanics);
+  if (moving) markUsed(g, 'gate_moving');
   // Moving rows can be missed entirely: estimate pessimistically.
   const est = estimateRow(d.options, g.E);
   const low = lowRow(d.options, g.Elow);
@@ -248,7 +248,7 @@ function jackpotPattern(g: Gen) {
   // Spectacular moment: a big multiplier, guarded on its side by a hazard when possible.
   const d = makeDilemma(dilemmaCtx(g, false), 'jackpot');
   const row = rowFromOptions(g, d.options, g.z + 9);
-  use(g, ...d.mechanics);
+  markUsed(g, ...d.mechanics);
   const bigGate = row.gates.find((x) => x.op.kind === 'mul')!;
   const cx = (bigGate.x0 + bigGate.x1) / 2;
   if (g.level > 6 && g.rng.chance(0.75)) guardLane(g, cx, g.z + 3);
@@ -413,7 +413,7 @@ function bonusPattern(g: Gen) {
     const side = rng.chance(0.5) ? -1 : 1;
     const amount = niceRound(Math.max(3, g.E * rng.range(0.15, 0.35) + 3));
     g.pickups.push({ id: g.nextId++, kind: 'stragglers', x: side * rng.range(2.2, 3.4), z: g.z + 4, amount });
-    use(g, 'pickup');
+    markUsed(g, 'pickup');
     if (g.level > 8 && rng.chance(0.5)) guardLane(g, side * 2.6, g.z);
     setE(g, g.E + amount * 0.6);
   } else {
@@ -436,7 +436,7 @@ function rivalPattern(g: Gen, boss: boolean) {
   const basis = Math.sqrt(g.E * g.Elow);
   const count = Math.max(3, Math.round(basis * ratio));
   g.rivals.push({ id: g.nextId++, z: g.z + 8, x: g.rng.range(-1.5, 1.5), count, boss });
-  use(g, 'rival');
+  markUsed(g, 'rival');
   setE(g, g.E - count, g.Elow - count);
   g.z += 8 + g.P.gap;
 }
@@ -446,7 +446,7 @@ function riskRewardPattern(g: Gen) {
   const k = g.E < 50 ? g.rng.pick([3, 4, 5]) : g.rng.pick([2, 3]);
   const safeVal = niceRound(Math.max(5, g.E * (k - 1) * g.rng.range(0.3, 0.55)));
   const row = rowFromOptions(g, [{ op: { kind: 'mul', n: k } }, { op: { kind: 'add', n: safeVal } }], g.z + 10);
-  use(g, 'gate_mul', 'gate_add');
+  markUsed(g, 'gate_mul', 'gate_add');
   const big = row.gates.find((x) => x.op.kind === 'mul')!;
   guardLane(g, (big.x0 + big.x1) / 2, g.z + 4);
   setE(g, Math.max(g.E + safeVal, g.E * k * 0.75));
@@ -471,7 +471,7 @@ function turnstilePattern(g: Gen) {
       { x0: 0, x1: HALF, op: right.op },
     ],
   });
-  use(g, 'gate_mul', 'gate_add');
+  markUsed(g, 'gate_mul', 'gate_add');
   setE(g, g.E >= T ? g.E * k * 0.85 : g.E + safe);
   g.z += 7 + g.P.gap;
 }
@@ -483,7 +483,7 @@ function boxesPattern(g: Gen) {
   obstacle(g, 'boxes', { x: side * 2.5, z: g.z + 2, w: 2.4, d: 0.9, hp });
   const amount = niceRound(hp * g.rng.range(2.2, 3.2));
   g.pickups.push({ id: g.nextId++, kind: 'stragglers', x: side * 2.5, z: g.z + 6, amount });
-  use(g, 'pickup');
+  markUsed(g, 'pickup');
   setE(g, g.E + (amount - hp) * 0.6);
   g.z += 8 + g.P.gap;
 }

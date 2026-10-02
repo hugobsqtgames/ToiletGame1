@@ -12,15 +12,16 @@ import { dailyChallengeStatus } from '../../meta/progression';
 import { buyUpgrade, openModal, play } from '../../state/actions';
 import { app } from '../../state/app';
 import { useStore } from '../../state/store';
+import { useNow } from '../hooks';
 import { getLanguage, t } from '../i18n';
 import { CoinIcon, CurrencyPill, GameButton, IconButton, Pulse, Txt, lighten, styles as kit } from '../components/kit';
 import { colors, radius, shadow } from '../theme';
 
 export function HomeScreen() {
+  const now = useNow();
   const save = useStore(app, (s) => s.save);
   useStore(app, (s) => s.lang);
   const insets = useSafeAreaInsets();
-  const now = Date.now();
   const world = getWorld(worldOfLevel(save.level));
   const lang = getLanguage();
   const daily = dailyStatus(save, now);
@@ -126,7 +127,7 @@ export function HomeScreen() {
         <Pulse>
           <GameButton
             label={t('play')}
-            sub={<Txt display size={14} color="rgba(255,255,255,0.92)">{world.theme.id && (save.level % LEVELS_PER_WORLD === 0 ? t('bossLevel') : t('level', { n: save.level }))}</Txt>}
+            sub={<Txt display size={14} color="rgba(255,255,255,0.92)">{save.level % LEVELS_PER_WORLD === 0 ? t('bossLevel') : t('level', { n: save.level })}</Txt>}
             icon="play"
             onPress={play}
             style={{ width: 250 }}

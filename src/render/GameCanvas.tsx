@@ -11,11 +11,12 @@ import { game } from './GameController';
  * loop entirely (backgrounded app, full-screen menus) to save battery.
  */
 function SceneBridge() {
-  const { scene, camera, size } = useThree();
+  const { scene, camera, size, get } = useThree();
   useEffect(() => {
-    game.attach(scene, camera as THREE.PerspectiveCamera, size.width / Math.max(1, size.height));
+    const sz = get().size;
+    game.attach(scene, camera as THREE.PerspectiveCamera, sz.width / Math.max(1, sz.height));
     return () => game.detach();
-  }, [scene, camera]);
+  }, [scene, camera, get]);
   useEffect(() => {
     game.setAspect(size.width / Math.max(1, size.height));
   }, [size.width, size.height]);

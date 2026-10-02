@@ -38,7 +38,7 @@ export class Fx extends THREE.Group {
   private pp: Pool;
   private flyers: THREE.InstancedMesh;
   private fp: Pool;
-  private labels: { label: VoxelLabel; mat: THREE.MeshBasicMaterial; life: number; vy: number }[] = [];
+  private labels: { label: VoxelLabel; mat: THREE.MeshBasicMaterial; life: number; vy: number; vz: number }[] = [];
   private nextLabel = 0;
   private partMat: THREE.MeshLambertMaterial;
   private flyMat: THREE.MeshLambertMaterial;
@@ -66,7 +66,7 @@ export class Fx extends THREE.Group {
       const label = new VoxelLabel(mat, 0.09, 6);
       label.visible = false;
       label.renderOrder = 20;
-      this.labels.push({ label, mat, life: 0, vy: 0 });
+      this.labels.push({ label, mat, life: 0, vy: 0, vz: 0 });
       this.add(label);
     }
   }
@@ -116,7 +116,8 @@ export class Fx extends THREE.Group {
     p.grav[i] = 16;
   }
 
-  floatText(text: string, x: number, y: number, z: number, color: THREE.ColorRepresentation, scale = 1) {
+  /** Rising text; `vz` lets it travel with the running crowd (world units/s). */
+  floatText(text: string, x: number, y: number, z: number, color: THREE.ColorRepresentation, scale = 1, vz = 0) {
     const l = this.labels[this.nextLabel];
     this.nextLabel = (this.nextLabel + 1) % this.labels.length;
     l.label.setText(text);
@@ -126,6 +127,7 @@ export class Fx extends THREE.Group {
     l.mat.opacity = 1;
     l.life = 1.1;
     l.vy = 2.2;
+    l.vz = vz;
     l.label.visible = true;
   }
 
@@ -175,6 +177,7 @@ export class Fx extends THREE.Group {
       if (l.life <= 0) continue;
       l.life -= dt;
       l.label.position.y += l.vy * dt;
+      l.label.position.z += l.vz * dt;
       l.vy *= 0.96;
       l.mat.opacity = Math.min(1, l.life / 0.4);
       l.label.quaternion.copy(camera.quaternion);

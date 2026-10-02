@@ -1,7 +1,7 @@
 import { AppState as RNAppState, BackHandler, PixelRatio, Platform } from 'react-native';
 import { generateLevel } from '../core/levelGen';
 import type { Simulation } from '../core/simulation';
-import { getWorld, worldOfLevel } from '../core/worlds';
+import { worldOfLevel } from '../core/worlds';
 import { claimDaily as claimDailyPure } from '../meta/daily';
 import { FREE_COINS_PER_DAY, GEM_COIN_PACKS, REVIVE_GEMS, freeCoinsAmount, gemPackCoins, reviveCount, startBonus, type UpgradeId } from '../meta/economy';
 import { refreshMissions } from '../meta/missions';
@@ -23,7 +23,7 @@ import { grantPurchase, restoreEntitlements, type ProductKey } from '../services
 import { log } from '../services/log';
 import { loadSave, persistSave, wipeSave } from '../services/storage';
 import { game, type QualityTier } from '../render/GameController';
-import { setLanguage, t } from '../ui/i18n';
+import { getLanguage, setLanguage, t } from '../ui/i18n';
 import { app, type ModalId } from './app';
 import { hud } from './hud';
 
@@ -92,7 +92,12 @@ export async function boot() {
   applySettings(save);
   if (source === 'backup' || source === 'recovered-default') log.warn('save recovered from', source);
 
-  game.setCallbacks({ onEnd: onRunEnd });
+  game.setCallbacks({
+    onEnd: onRunEnd,
+    onEvent: (e) => {
+      if (e.type === 'gate') analytics.track({ name: 'gate_taken', params: { level: app.get().run?.def.level ?? 0, kind: e.op.kind, before: e.before, after: e.after } });
+    },
+  });
   game.onSlowFrames = () => {
     const st = app.get();
     if (st.save.settings.quality !== 'auto') return;
@@ -273,7 +278,7 @@ function onRunEnd(kind: 'won' | 'lost', sim: Simulation, info: { multiplier: num
 
 export async function reviveWithAd() {
   const ok = await ads.showRewarded('revive');
-  if (!ok) return toast(t('purchaseFailed').split('.')[0], 'bad');
+  if (!ok) return toast(t('adUnavailable'), 'bad');
   lastPurchaseOrRewardAt = now();
   commit(recordRewardedShown(app.get().save, now()));
   doRevive();
@@ -319,6 +324,7 @@ function finalizeRun(won: boolean, sim: Simulation, info: { multiplier: number; 
   commit(recordRunForAds(save));
   audio.duck(true);
   analytics.track({ name: 'level_end', params: { level: result.level, won, finish: result.finishCount, peak: result.stats.peak, time: Math.round(sim.s.t), revived: result.revived, mode: run.mode } });
+  if (run.def.tutorial) analytics.track({ name: 'tutorial_step', params: { step: won ? 'complete' : 'failed' } });
   app.set({ results: { result, rewards, tripled: false }, modal: 'results' });
   if (rewards.newWorld && worldOfLevel(save.level) > prevWorld) {
     analytics.track({ name: 'world_unlocked', params: { world: rewards.newWorld } });
@@ -414,7 +420,8 @@ export function buyUpgrade(id: UpgradeId) {
 export function buySkin(id: string) {
   if (!mutate((s) => buySkinPure(s, id))) {
     haptics.error();
-    return toast(t('notEnough', { c: '' }).trim(), 'bad');
+    const u = skinById(id).unlock;
+    return toast(t('notEnough', { c: u.type === 'gems' ? '💎' : '🪙' }), 'bad');
   }
   analytics.track({ name: 'skin_unlocked', params: { skin: id, source: 'shop' } });
   audio.play('unlock');
@@ -518,9 +525,8 @@ export function rewardText(r: Reward): string {
   if (r.gems) parts.push(`+${r.gems} 💎`);
   if (r.keys) parts.push(`+${r.keys} 🔑`);
   if (r.chest) parts.push(r.chest === 'epic' ? t('chestEpic') : t('chestBasic'));
-  if (r.skin) parts.push(skinById(r.skin).name.en);
+  if (r.skin) parts.push(skinById(r.skin).name[getLanguage()]);
   return parts.join('  ');
 }
 
-export const currentWorldInfo = () => getWorld(worldOfLevel(app.get().save.level));
 export { hud };

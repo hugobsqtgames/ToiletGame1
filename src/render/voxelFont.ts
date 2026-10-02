@@ -96,8 +96,6 @@ export function glyphGeometry(ch: string): THREE.BufferGeometry {
   return g;
 }
 
-export const SHARED_GLYPHS = cache;
-
 /**
  * A text label made of glyph meshes. setText() only swaps geometry
  * references (no allocation) as long as the length fits the pool.
@@ -121,7 +119,6 @@ export class VoxelLabel extends THREE.Group {
     const m = new THREE.Mesh(glyphGeometry(' '), this.material);
     m.visible = false;
     m.scale.setScalar(this.pixel);
-    m.frustumCulled = false;
     this.meshes.push(m);
     this.add(m);
   }
@@ -145,4 +142,36 @@ export class VoxelLabel extends THREE.Group {
       } else m.visible = false;
     }
   }
+}
+
+/**
+ * Static text baked into ONE mesh (one draw call), centered like VoxelLabel.
+ * Use for labels that never change (signs, stall multipliers, piles...).
+ */
+export function bakeText(text: string, material: THREE.Material, pixel = 0.1): THREE.Mesh {
+  const adv = 6;
+  const startX = -(text.length * adv - 1) / 2;
+  let count = 0;
+  const glyphs = [...text].map((ch) => glyphGeometry(ch));
+  for (const g of glyphs) count += g.getAttribute('position').count;
+  const pos = new Float32Array(Math.max(1, count) * 3);
+  const nor = new Float32Array(Math.max(1, count) * 3);
+  let o = 0;
+  glyphs.forEach((g, i) => {
+    const gp = g.getAttribute('position');
+    const gn = g.getAttribute('normal');
+    for (let k = 0; k < gp.count; k++, o++) {
+      pos[o * 3] = (gp.getX(k) + startX + i * adv) * pixel;
+      pos[o * 3 + 1] = (gp.getY(k) - 3.5) * pixel;
+      pos[o * 3 + 2] = gp.getZ(k) * pixel;
+      nor[o * 3] = gn.getX(k);
+      nor[o * 3 + 1] = gn.getY(k);
+      nor[o * 3 + 2] = gn.getZ(k);
+    }
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  geo.computeBoundingSphere();
+  return new THREE.Mesh(geo, material);
 }

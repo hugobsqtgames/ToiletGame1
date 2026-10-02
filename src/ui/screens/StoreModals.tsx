@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCount } from '../../core/format';
@@ -16,6 +16,7 @@ import type { ProductKey } from '../../services/iap/catalog';
 import { buyCoinsWithGems, buyProduct, buySkin, closeModal, freeCoins, openChest, previewSkin, restorePurchases, selectSkin } from '../../state/actions';
 import { app } from '../../state/app';
 import { useStore } from '../../state/store';
+import { useNow, useAnimatedValue } from '../hooks';
 import { getLanguage, t, tk } from '../i18n';
 import { CloseButton, CoinIcon, CurrencyPill, GameButton, GemIcon, Pulse, RewardChips, Sheet, Txt, lighten, styles as kit } from '../components/kit';
 import { colors, radius, shadow } from '../theme';
@@ -23,10 +24,11 @@ import { colors, radius, shadow } from '../theme';
 /* ---------------- Shop ---------------- */
 
 export function ShopModal() {
+  const now = useNow();
   const save = useStore(app, (s) => s.save);
   const busy = useStore(app, (s) => s.busy);
   useStore(app, (s) => s.storeTick);
-  const today = dayKey(Date.now());
+  const today = dayKey(now);
   const freeLeft = FREE_COINS_PER_DAY - (save.ads.freeCoinsDay === today ? save.ads.freeCoinsCount : 0);
   const storeOk = iap.available;
   const price = (k: ProductKey) => iap.price(k);
@@ -97,7 +99,7 @@ export function ShopModal() {
               <Txt display size={14} color="#fff">{t('free')}</Txt>
             </Pressable>
           </View>
-          {GEM_COIN_PACKS.slice(0, 2).map((p) => (
+          {GEM_COIN_PACKS.map((p) => (
             <View key={p.id} style={s.pack}>
               <MaterialCommunityIcons name="circle-multiple" size={36} color={colors.gold} />
               <Txt display size={16}>{formatCount(gemPackCoins(p.coinsFactor, save.level))}</Txt>
@@ -237,8 +239,8 @@ function SkinTile({ skin, owned, selected, focused, onPress }: { skin: SkinDef; 
 export function ChestModal() {
   const save = useStore(app, (s) => s.save);
   const [opening, setOpening] = useState<{ tier: 'basic' | 'epic' | 'keys'; reward: Reward | null } | null>(null);
-  const shake = useRef(new Animated.Value(0)).current;
-  const burst = useRef(new Animated.Value(0)).current;
+  const shake = useAnimatedValue(0);
+  const burst = useAnimatedValue(0);
 
   const start = (tier: 'basic' | 'epic' | 'keys') => {
     setOpening({ tier, reward: null });

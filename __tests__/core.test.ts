@@ -151,3 +151,15 @@ describe('format', () => {
     expect(formatCount(2_500_000)).toBe('2.5M');
   });
 });
+
+describe('finish corridor', () => {
+  it('never contains obstacles, gates or pickups', () => {
+    for (let L = 1; L < 400; L += 7) {
+      const d = generateLevel(L);
+      const lim = d.length - 6;
+      expect(d.obstacles.every((o) => o.z < lim)).toBe(true);
+      expect(d.gateRows.every((r) => r.z < lim)).toBe(true);
+      expect(d.pickups.every((p) => p.z < lim)).toBe(true);
+    }
+  });
+});

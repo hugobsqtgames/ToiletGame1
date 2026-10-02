@@ -208,6 +208,7 @@ export const en = {
   resetConfirm: 'Erase all progress? Purchases can be restored afterwards.',
   version: 'Version {v}',
   credits: 'Made with love, plungers and Expo.',
+  adUnavailable: 'No ad available right now. Try again later.',
   testAd: 'TEST AD',
   testAdDesc: 'Simulated ad (development build only). Real ads appear in store builds.',
   testAdSkip: 'Close',

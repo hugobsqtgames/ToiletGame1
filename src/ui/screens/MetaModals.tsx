@@ -15,6 +15,7 @@ import { appVersion } from '../../services/platform';
 import { claimAchievement, claimDaily, claimMission, closeModal, resetProgress, restorePurchases, startDailyChallenge, updateSettings } from '../../state/actions';
 import { app } from '../../state/app';
 import { useStore } from '../../state/store';
+import { useNow } from '../hooks';
 import { getLanguage, t, tk } from '../i18n';
 import { GameButton, ProgressBar, RewardChips, Sheet, Txt, styles as kit } from '../components/kit';
 import { colors, radius } from '../theme';
@@ -25,8 +26,9 @@ export const PRIVACY_POLICY_URL = 'https://example.com/loorush/privacy';
 /* ---------------- Daily ---------------- */
 
 export function DailyModal() {
+  const now = useNow();
   const save = useStore(app, (s) => s.save);
-  const st = dailyStatus(save, Date.now());
+  const st = dailyStatus(save, now);
   return (
     <Sheet title={t('dailyTitle')} onClose={closeModal} headerColor="#FF5FA2">
       <View style={s.grid}>
@@ -65,7 +67,7 @@ export function DailyModal() {
         {st.canClaim ? (
           <GameButton label={t('claim')} icon="gift" onPress={claimDaily} style={{ width: 230 }} testID="btn-claim-daily" />
         ) : (
-          <Txt display size={16} color={colors.inkSoft}>{t('dailyCome')} · {formatDuration(msUntilTomorrow(Date.now()))}</Txt>
+          <Txt display size={16} color={colors.inkSoft}>{t('dailyCome')} · {formatDuration(msUntilTomorrow(now))}</Txt>
         )}
       </View>
     </Sheet>
@@ -75,9 +77,9 @@ export function DailyModal() {
 /* ---------------- Missions ---------------- */
 
 export function MissionsModal() {
+  const now = useNow();
   const save = useStore(app, (s) => s.save);
   const [tab, setTab] = useState<'daily' | 'weekly' | 'ach'>('daily');
-  const now = Date.now();
   return (
     <Sheet title={t('missions')} onClose={closeModal} headerColor={colors.warn}>
       <View style={s.tabs}>
@@ -152,8 +154,9 @@ function ClaimBox({ reward, can, onPress, testID }: { reward: MissionState['rewa
 /* ---------------- Challenges ---------------- */
 
 export function ChallengesModal() {
+  const now = useNow();
   const save = useStore(app, (s) => s.save);
-  const dc = dailyChallengeStatus(save, Date.now());
+  const dc = dailyChallengeStatus(save, now);
   return (
     <Sheet title={t('challenges')} onClose={closeModal} headerColor={colors.purple}>
       <View style={{ gap: 12 }}>
@@ -167,7 +170,7 @@ export function ChallengesModal() {
           </View>
           <Txt size={13} color="#FFE48A" style={{ marginTop: 8 }}>{dc.completed ? t('dailyChallengeDone', { n: formatCount(dc.best) }) : t('dailyChallengeReward')}</Txt>
           <GameButton label={t('play')} icon="play" size="m" color={dc.completed ? '#9AA4B8' : colors.play} dark={dc.completed ? '#6E7891' : colors.playDark} onPress={startDailyChallenge} style={{ marginTop: 10, alignSelf: 'center', width: 200 }} testID="btn-daily-challenge" />
-          <Txt size={11} color="rgba(255,255,255,0.8)" align="center" style={{ marginTop: 6 }}>{t('resetsIn', { t: formatDuration(msUntilTomorrow(Date.now())) })}</Txt>
+          <Txt size={11} color="rgba(255,255,255,0.8)" align="center" style={{ marginTop: 6 }}>{t('resetsIn', { t: formatDuration(msUntilTomorrow(now)) })}</Txt>
         </LinearGradient>
         <View style={s.mission}>
           <View style={[s.mIcon, { backgroundColor: colors.primary }]}>

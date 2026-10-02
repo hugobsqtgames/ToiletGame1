@@ -2,12 +2,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { useAnimatedValue } from '../hooks';
 import { formatCount } from '../../core/format';
 import type { Reward } from '../../meta/save';
 import { skinById } from '../../meta/skins';
 import { audio } from '../../services/audio';
 import { haptics } from '../../services/haptics';
-import { t } from '../i18n';
+import { getLanguage, t } from '../i18n';
 import { colors, fonts, radius, shadow, textOutline } from '../theme';
 
 export type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -38,7 +39,7 @@ export function Txt({ children, size = 16, color = colors.ink, display, outline,
 /* ---------------- Press feedback ---------------- */
 
 export function usePressScale() {
-  const v = useRef(new Animated.Value(1)).current;
+  const v = useAnimatedValue(1);
   const onPressIn = () => Animated.spring(v, { toValue: 0.92, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
   const onPressOut = () => Animated.spring(v, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 12 }).start();
   return { scale: v, onPressIn, onPressOut };
@@ -170,7 +171,7 @@ export function KeyIcon({ size = 20 }: { size?: number }) {
 }
 
 export function CurrencyPill({ kind, value, onPlus, testID }: { kind: 'coins' | 'gems' | 'keys'; value: number; onPlus?: () => void; testID?: string }) {
-  const bump = useRef(new Animated.Value(1)).current;
+  const bump = useAnimatedValue(1);
   const prev = useRef(value);
   useEffect(() => {
     if (value !== prev.current) {
@@ -222,7 +223,7 @@ export function Sheet({ title, onClose, children, headerColor = colors.primary, 
   scrim?: boolean;
   compact?: boolean;
 }) {
-  const a = useRef(new Animated.Value(0)).current;
+  const a = useAnimatedValue(0);
   useEffect(() => {
     Animated.spring(a, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 7 }).start();
   }, [a]);
@@ -260,7 +261,7 @@ export function RewardChips({ reward, size = 'm' }: { reward: Reward; size?: 's'
   if (reward.gems) items.push(<Chip key="g" icon={<GemIcon size={is} />} text={String(reward.gems)} fs={fs} />);
   if (reward.keys) items.push(<Chip key="k" icon={<KeyIcon size={is} />} text={String(reward.keys)} fs={fs} />);
   if (reward.chest) items.push(<Chip key="ch" icon={<MaterialCommunityIcons name="treasure-chest" size={is} color={reward.chest === 'epic' ? colors.gold : '#C68B59'} />} text={reward.chest === 'epic' ? t('chestEpic') : t('chestBasic')} fs={fs * 0.75} />);
-  if (reward.skin) items.push(<Chip key="s" icon={<MaterialCommunityIcons name="account-star" size={is} color={colors.purple} />} text={skinById(reward.skin).name.en} fs={fs * 0.75} />);
+  if (reward.skin) items.push(<Chip key="s" icon={<MaterialCommunityIcons name="account-star" size={is} color={colors.purple} />} text={skinById(reward.skin).name[getLanguage()]} fs={fs * 0.75} />);
   return <View style={[styles.row, { flexWrap: 'wrap', justifyContent: 'center', gap: 8 }]}>{items}</View>;
 }
 
@@ -279,7 +280,7 @@ function Chip({ icon, text, fs }: { icon: React.ReactNode; text: string; fs: num
 
 /** Gentle looping pulse to draw attention (claimable rewards, CTA). */
 export function Pulse({ children, active = true, style }: { children: React.ReactNode; active?: boolean; style?: StyleProp<ViewStyle> }) {
-  const v = useRef(new Animated.Value(0)).current;
+  const v = useAnimatedValue(0);
   useEffect(() => {
     if (!active) return;
     const loop = Animated.loop(

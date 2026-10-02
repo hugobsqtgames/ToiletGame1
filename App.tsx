@@ -40,12 +40,14 @@ const MODALS: Record<ModalId, React.ComponentType> = {
 const OPAQUE: ModalId[] = [];
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ LilitaOne_400Regular, Nunito_700Bold, Nunito_800ExtraBold, Nunito_900Black });
+  const [fontsReady, fontError] = useFonts({ LilitaOne_400Regular, Nunito_700Bold, Nunito_800ExtraBold, Nunito_900Black });
   const screen = useStore(app, (s) => s.screen);
   const modal = useStore(app, (s) => s.modal);
   const quality = useStore(app, (s) => resolveQuality(s.save, s.qualityOverride));
   const foreground = useStore(app, (s) => s.foreground);
 
+  // A font failure must never block the game: fall back to system fonts.
+  const fontsLoaded = fontsReady || !!fontError;
   useEffect(() => {
     if (!fontsLoaded) return;
     SplashScreen.hideAsync().catch(() => {});

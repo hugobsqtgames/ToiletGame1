@@ -323,7 +323,7 @@ export class GameController {
         const mult = e.op.kind === 'mul' && e.op.n >= 2;
         const tone = gateTone(e.op);
         const color = e.op.kind === 'mul' ? '#2BD47D' : GATE_COLORS[tone];
-        this.fx.floatText(opLabel(e.op), s.x, 2.4, wzc - 1, good ? '#FFFFFF' : '#FF4D5E', mult ? 1.4 : 1.1);
+        this.fx.floatText(opLabel(e.op), s.x, 2.4, wzc - 1, good ? '#FFFFFF' : '#FF4D5E', mult ? 1.4 : 1.1, -sim.level.speed);
         if (good) {
           this.fx.burst(s.x, 1, wzc - 0.5, mult ? 70 : 30, [color, '#FFFFFF', '#FFE14D'], { speed: mult ? 7 : 4.5, up: mult ? 8 : 5 });
           audio.play(mult ? 'gate_mult' : 'gate_good');
@@ -359,7 +359,7 @@ export class GameController {
       }
       case 'gain':
         this.hidePickupAt(sim, e.x, e.z, 'stragglers');
-        this.fx.floatText('+' + formatCount(e.amount), e.x, 2, -e.z, '#2BD47D', 1.1);
+        this.fx.floatText('+' + formatCount(e.amount), e.x, 2, -e.z, '#2BD47D', 1.1, -sim.level.speed);
         this.fx.burst(e.x, 0.6, -e.z, 26, ['#2BD47D', '#FFFFFF'], { speed: 4, up: 5 });
         audio.play('gain');
         haptics.light();

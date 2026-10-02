@@ -7,7 +7,7 @@ import type { Part } from './geo';
  * list of "props" (parts relative to the prop origin); the level builder
  * merges them all into the static mesh. Pure geometry, no textures.
  */
-const S = (r: number, w = 10, h = 8) => new THREE.SphereGeometry(r, w, h);
+const S = (r: number, w = 8, h = 6) => new THREE.SphereGeometry(r, w, h);
 const C = (rt: number, rb: number, h: number, seg = 10) => new THREE.CylinderGeometry(rt, rb, h, seg);
 const B = (x: number, y: number, z: number) => new THREE.BoxGeometry(x, y, z);
 const CONE = (r: number, h: number, seg = 8) => new THREE.ConeGeometry(r, h, seg);

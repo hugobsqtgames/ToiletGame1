@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { useAnimatedValue } from '../hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCount } from '../../core/format';
 import { getWorld } from '../../core/worlds';
@@ -176,7 +177,7 @@ export function PlayScreen() {
 }
 
 function DragHint() {
-  const v = useRef(new Animated.Value(0)).current;
+  const v = useAnimatedValue(0);
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([

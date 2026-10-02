@@ -46,4 +46,4 @@ export const recordRewardedShown = recordInterstitialShown;
  * Rewarded placements. Rewarded ads stay available after Remove Ads because
  * they are always opt-in and grant a bonus (stated clearly in the shop).
  */
-export type RewardedPlacement = 'revive' | 'tripleCoins' | 'freeCoins' | 'doubleChest';
+export type RewardedPlacement = 'revive' | 'tripleCoins' | 'freeCoins';

@@ -88,13 +88,3 @@ export function gateLabelLines(op: GateOp): { small?: string; big: string; small
       return { big: opLabel(op) };
   }
 }
-
-/** Mechanic category of an op (analytics + missions). */
-export function opCategory(op: GateOp): 'add' | 'sub' | 'mul' | 'div' | 'pct' | 'mystery' | 'cond' {
-  return op.kind;
-}
-
-/** True when the op can only reduce the crowd (for the "no divide" challenge). */
-export function isHarmful(op: GateOp, countBefore: number): boolean {
-  return applyOp(op, countBefore) < countBefore;
-}

@@ -1,6 +1,6 @@
 import { niceRound } from '../core/math';
 import { hashString, Rng } from '../core/rng';
-import type { MetricId, MissionState, Reward, SaveData, Stats } from './save';
+import type { MetricId, MissionState, Reward, SaveData } from './save';
 import { dayKey, weekKey } from './time';
 
 /**
@@ -62,10 +62,13 @@ export function refreshMissions(save: SaveData, now: number): SaveData {
   const dk = dayKey(now);
   const wk = weekKey(now);
   let missions = save.missions;
-  if (missions.dailyKey !== dk || missions.daily.length === 0) {
+  // Clock rolled back (device date changed): keep the current missions, never regenerate.
+  const rolledBackDay = missions.dailyKey !== null && dk < missions.dailyKey;
+  const rolledBackWeek = missions.weeklyKey !== null && wk < missions.weeklyKey;
+  if (!rolledBackDay && (missions.dailyKey !== dk || missions.daily.length === 0)) {
     missions = { ...missions, dailyKey: dk, daily: build(DAILY_POOL, hashString('d' + dk), save.level, 'd' + dk, false) };
   }
-  if (missions.weeklyKey !== wk || missions.weekly.length === 0) {
+  if (!rolledBackWeek && (missions.weeklyKey !== wk || missions.weekly.length === 0)) {
     missions = { ...missions, weeklyKey: wk, weekly: build(WEEKLY_POOL, hashString('w' + wk), save.level, 'w' + wk, true) };
   }
   return missions === save.missions ? save : { ...save, missions };
@@ -125,5 +128,3 @@ export function countClaimable(save: SaveData): number {
   for (const a of ACHIEVEMENTS) if (achievementState(save, a).claimable) n++;
   return n;
 }
-
-export const statsToMetricTotals = (s: Stats) => s;

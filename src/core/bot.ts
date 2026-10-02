@@ -1,5 +1,4 @@
 import { SIM, TRACK } from './config';
-import { generateLevel } from './levelGen';
 import { Simulation } from './simulation';
 import type { Rng } from './rng';
 
@@ -95,9 +94,4 @@ export function randomBot(sim: Simulation, rng: Rng): BotResult {
     for (const e of sim.drainEvents()) if (e.type === 'won') { mult = e.multiplier; finishCount = e.finishCount; }
   }
   return { won: sim.s.phase === 'won', finishCount, peak: sim.s.stats.peak, multiplier: mult, timeSec: sim.s.t };
-}
-
-export function playLevel(level: number, bot: 'planner' | 'random', rng?: Rng) {
-  const sim = new Simulation(generateLevel(level));
-  return bot === 'planner' ? plannerBot(sim) : randomBot(sim, rng!);
 }
