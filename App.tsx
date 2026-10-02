@@ -10,7 +10,7 @@ import { GameCanvas } from './src/render/GameCanvas';
 import { boot, dprFor, resolveQuality } from './src/state/actions';
 import { app, type ModalId } from './src/state/app';
 import { useStore } from './src/state/store';
-import { DevAdOverlay, ToastHost } from './src/ui/components/Overlays';
+import { DevAdOverlay, DevPurchaseOverlay, ToastHost } from './src/ui/components/Overlays';
 import { BootScreen } from './src/ui/screens/BootScreen';
 import { HomeScreen } from './src/ui/screens/HomeScreen';
 import { ChallengesModal, DailyModal, MissionsModal, SettingsModal, WorldsModal } from './src/ui/screens/MetaModals';
@@ -68,6 +68,7 @@ export default function App() {
         {screen === 'boot' || !fontsLoaded ? <BootScreen /> : null}
         <ToastHost />
         <DevAdOverlay />
+        <DevPurchaseOverlay />
       </View>
     </SafeAreaProvider>
   );

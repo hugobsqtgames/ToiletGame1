@@ -4,6 +4,8 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { useAnimatedValue } from '../hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerDevAdPresenter, type DevAdRequest } from '../../services/ads/devSim';
+import { registerDevPurchasePresenter, type DevPurchaseRequest } from '../../services/iap/IapService';
+import { productById } from '../../services/iap/catalog';
 import { app } from '../../state/app';
 import { useStore } from '../../state/store';
 import { t } from '../i18n';
@@ -70,6 +72,46 @@ export function ToastHost() {
 }
 
 const s = StyleSheet.create({
+  payScrim: { backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end', zIndex: 100 },
+  paySheet: { backgroundColor: '#F7F7FA', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, alignItems: 'stretch' },
+  payHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#C9CCD6', marginBottom: 10 },
+  payRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.m, padding: 12, marginTop: 8 },
   ad: { backgroundColor: '#111428', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
   toast: { position: 'absolute', alignSelf: 'center', paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.l, borderWidth: 3, borderColor: '#fff', ...shadow, zIndex: 90 },
 });
+
+/** DEVELOPMENT ONLY: simulated StoreKit confirmation sheet (no payment happens). */
+export function DevPurchaseOverlay() {
+  const [req, setReq] = useState<DevPurchaseRequest | null>(null);
+  const insets = useSafeAreaInsets();
+  useEffect(() => {
+    registerDevPurchasePresenter(setReq);
+    return () => registerDevPurchasePresenter(null);
+  }, []);
+  if (!req) return null;
+  const done = (ok: boolean) => {
+    const r = req;
+    setReq(null);
+    r.resolve(ok);
+  };
+  const p = productById(req.productId);
+  return (
+    <View style={[StyleSheet.absoluteFill, s.payScrim]}>
+      <View style={[s.paySheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={s.payHandle} />
+        <Txt display size={13} color={colors.danger}>{t('sandboxTitle')}</Txt>
+        <View style={s.payRow}>
+          <MaterialCommunityIcons name="toilet" size={44} color={colors.primary} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Txt display size={18}>Loo Rush</Txt>
+            <Txt size={13} color={colors.inkSoft}>{p?.id}</Txt>
+          </View>
+          <Txt display size={20}>{req.price}</Txt>
+        </View>
+        <Txt size={13} color={colors.inkSoft} align="center" style={{ marginVertical: 10 }}>{t('sandboxDesc')}</Txt>
+        <GameButton label={t('sandboxConfirm')} icon="check-bold" color={colors.primary} dark={colors.primaryDark} onPress={() => done(true)} testID="devpay-confirm" />
+        <GameButton label={t('cancel')} size="s" color="#9AA4B8" dark="#6E7891" onPress={() => done(false)} style={{ marginTop: 10, alignSelf: 'center' }} testID="devpay-cancel" />
+      </View>
+    </View>
+  );
+}

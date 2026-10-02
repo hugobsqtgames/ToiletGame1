@@ -1,4 +1,3 @@
-import { Alert } from 'react-native';
 import { hasIapNative } from '../platform';
 import { log } from '../log';
 import { analytics } from '../analytics';
@@ -127,6 +126,17 @@ function createStoreKitProvider(): Provider {
   };
 }
 
+/** DEVELOPMENT ONLY: UI presenter for the simulated purchase sheet (ui/components/Overlays.tsx). */
+export interface DevPurchaseRequest {
+  productId: string;
+  price: string;
+  resolve: (confirmed: boolean) => void;
+}
+let devPresenter: ((r: DevPurchaseRequest) => void) | null = null;
+export function registerDevPurchasePresenter(p: ((r: DevPurchaseRequest) => void) | null) {
+  devPresenter = p;
+}
+
 /** DEVELOPMENT ONLY: exercises the full grant flow without StoreKit. */
 function createDevSimProvider(): Provider {
   const owned = new Set<string>();
@@ -136,17 +146,18 @@ function createDevSimProvider(): Provider {
     products: () => fallbackProducts().map((p) => ({ ...p, displayPrice: p.displayPrice + ' (test)' })),
     buy(id) {
       return new Promise<PurchaseStatus>((resolve) => {
-        Alert.alert('Sandbox simulation', 'Development build without StoreKit. No real payment will happen. Simulate a successful purchase?', [
-          { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancelled') },
-          {
-            text: 'Simulate',
-            onPress: async () => {
-              await onVerified(id, `devsim-${id}-${Date.now()}`);
-              if (productById(id)?.type === 'nonConsumable') owned.add(id);
-              resolve('success');
-            },
+        if (!devPresenter) return resolve('unavailable');
+        const price = fallbackProducts().find((p) => p.id === id)?.displayPrice ?? '';
+        devPresenter({
+          productId: id,
+          price,
+          resolve: async (confirmed) => {
+            if (!confirmed) return resolve('cancelled');
+            await onVerified(id, `devsim-${id}-${Date.now()}`);
+            if (productById(id)?.type === 'nonConsumable') owned.add(id);
+            resolve('success');
           },
-        ]);
+        });
       });
     },
     restore: async () => [...owned],
