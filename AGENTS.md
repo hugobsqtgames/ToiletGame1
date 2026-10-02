@@ -25,6 +25,10 @@ Run lint and typecheck before declaring any task done.
 
 ## Navigation & Routing
 
+> **Project exception:** LOO RUSH is a 3D game with one persistent GL canvas. It intentionally does NOT use Expo Router: screens are overlays driven by `src/state/app.ts` (see docs/ARCHITECTURE.md §1). Do not migrate to routes.
+
+Generic guidance for Expo apps:
+
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
 - Docs: https://docs.expo.dev/router/introduction.md
