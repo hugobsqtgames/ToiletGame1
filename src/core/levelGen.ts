@@ -125,6 +125,13 @@ export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
     g.pickups.push({ id: g.nextId++, kind: 'key', x: rng.pick([-3.6, 3.6]), z, amount: 1 });
   }
 
+  // Patterns may spill past their budget: keep the finish corridor clean.
+  const limit = length - 6;
+  g.obstacles = g.obstacles.filter((o) => o.z + (o.kind === 'roller' ? 0 : o.d) < limit);
+  g.rows = g.rows.filter((r) => r.z < limit);
+  g.pickups = g.pickups.filter((p) => p.z < limit);
+  g.rivals = g.rivals.filter((r) => r.z < limit);
+
   const Efinish = Math.max(1, g.E);
   const finish = {
     z: length,

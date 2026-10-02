@@ -1,5 +1,5 @@
 {
-  "name": "scaffold",
+  "name": "loo-rush",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -43,7 +43,17 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "balance": "tsx scripts/balance.ts"
   },
-  "private": true
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/scripts/"
+    ]
+  }
 }
