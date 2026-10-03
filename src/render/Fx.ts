@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { VoxelLabel } from './voxelFont';
+import { TextLabel, textMaterial } from './text3d';
 
 /**
  * Pooled visual effects. No allocation after construction:
  *  - particles (confetti, poofs, sparkles): one InstancedMesh,
  *  - flyers (members knocked out, tumbling away): one InstancedMesh per look,
- *  - floating texts (+15, x3...): small VoxelLabel pool.
+ *  - floating texts (+15, x3...): small TextLabel pool.
  */
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -38,7 +38,7 @@ export class Fx extends THREE.Group {
   private pp: Pool;
   private flyers: THREE.InstancedMesh;
   private fp: Pool;
-  private labels: { label: VoxelLabel; mat: THREE.MeshBasicMaterial; life: number; vy: number; vz: number }[] = [];
+  private labels: { label: TextLabel; mat: THREE.MeshBasicMaterial; life: number; vy: number; vz: number }[] = [];
   private nextLabel = 0;
   private partMat: THREE.MeshLambertMaterial;
   private flyMat: THREE.MeshLambertMaterial;
@@ -62,8 +62,8 @@ export class Fx extends THREE.Group {
     for (let i = 0; i < maxFlyers; i++) this.flyers.setMatrixAt(i, _m.makeScale(0, 0, 0));
     this.add(this.parts, this.flyers);
     for (let i = 0; i < 6; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false });
-      const label = new VoxelLabel(mat, 0.09, 6);
+      const mat = textMaterial('#FFFFFF', { transparent: true, depthTest: false });
+      const label = new TextLabel(mat, 0.7, 6);
       label.visible = false;
       label.renderOrder = 20;
       this.labels.push({ label, mat, life: 0, vy: 0, vz: 0 });

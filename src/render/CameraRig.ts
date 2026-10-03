@@ -72,8 +72,8 @@ export class CameraRig {
         _look.set(x + 0.1, -0.9, wzc + 0.4);
         break;
       case 'play':
-        _target.set(x * 0.55, 7.2 + R * 1.25, wzc + 8.6 + R * 1.5);
-        _look.set(x * 0.8, 0, wzc - 7);
+        _target.set(x * 0.55, 6.4 + R * 1.15, wzc + 8.4 + R * 1.5);
+        _look.set(x * 0.8, 0.6, wzc - 12);
         break;
       case 'finish': {
         // High, slightly swaying view down the stall corridor.

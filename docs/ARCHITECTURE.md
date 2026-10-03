@@ -60,8 +60,10 @@ src/
     characters.ts     procedural character + accessory geometry per skin
     Fx.ts             pooled particles, knocked-out flyers, floating texts
     CameraRig.ts      follow camera (menu / play / finish / showcase), shake, FOV punch
-    voxelFont.ts      5x7 voxel font (3D text without textures)
-    decor.ts, geo.ts  themed props, geometry merging
+    text3d.ts         smooth extruded 3D text in Lilita One (fonts/lilita.json, scripts/gen-font.js)
+    environment/      world scenery: kits.ts (props of the 8 worlds), build.ts (ground, prop rows,
+                      edges, "WC 150M" signs, giant restroom landmark, sky)
+    geo.ts            geometry merging, pill badges, sky dome
   state/       store.ts (tiny external store), app.ts (UI state), hud.ts (high-freq HUD), actions.ts
   ui/          theme, i18n (en/fr), components/kit, screens/*
 scripts/       gen-audio.js (procedural audio), balance.ts, make-save.ts (QA)
@@ -95,7 +97,7 @@ assets/        icon, splash, generated audio
 |---|---|
 | Crowd | `InstancedMesh` per part (body, left leg, right leg, blob shadow): **4 draw calls for 220 animated characters**. Skin colors baked as vertex colors. Character ≈ 650 vertices (indexed). |
 | Count vs visuals | Up to 220 simulated & rendered members; beyond that each member represents `count / 220` people and losses are weighted, so the number shown always matches what you see happen. |
-| Level geometry | All static props merged into **one indexed vertex-colored mesh** per level; static 3D texts baked into one mesh each. Typical level: <300 meshes, mostly frustum-culled. |
+| Level geometry | Track and static props merged into **one indexed vertex-colored mesh**; every scenery prop type is **one InstancedMesh** (+1 for its unlit "glow" parts: windows, screens, lamps). A fully decorated level ≈ 250–340k vertices, ~150–220 meshes (most are frustum-culled gate/label glyphs). |
 | Effects | Pooled instanced particles (360) and flyers (70); no allocation during gameplay. |
 | Materials/lighting | Lambert + hemisphere + one directional light; **no shadow maps** (soft blob shadows). Fog hides far geometry. |
 | Memory | Each level's GPU resources are disposed on level change (including instanced buffers). Shared glyph/character geometries are cached once. |

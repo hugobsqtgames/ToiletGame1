@@ -13,9 +13,10 @@ import { hud } from '../state/hud';
 import { CameraRig, type CamMode } from './CameraRig';
 import { characterGeometry } from './characters';
 import { CrowdView } from './CrowdView';
+import { Pill } from './geo';
 import { Fx } from './Fx';
 import { GATE_COLORS, LevelView, STALL_COLORS } from './LevelView';
-import { VoxelLabel } from './voxelFont';
+import { TextLabel, textMaterial } from './text3d';
 
 /**
  * Bridges the deterministic Simulation with the three.js scene, audio and
@@ -43,8 +44,8 @@ export class GameController {
   private crowd: CrowdView | null = null;
   private fx = new Fx();
   private countGroup = new THREE.Group();
-  private countLabel: VoxelLabel;
-  private countPill: THREE.Mesh;
+  private countLabel: TextLabel;
+  private countPill: Pill;
   private countMat = new THREE.MeshBasicMaterial({ color: '#2B7BFF' });
   private hemi = new THREE.HemisphereLight('#ffffff', '#8899aa', 1.6);
   private sun = new THREE.DirectionalLight('#ffffff', 1.5);
@@ -71,10 +72,10 @@ export class GameController {
   private autoplayTimer = 0;
 
   constructor() {
-    const labelMat = new THREE.MeshBasicMaterial({ color: '#FFFFFF', depthTest: false });
-    this.countLabel = new VoxelLabel(labelMat, 0.07, 7);
+    const labelMat = textMaterial('#FFFFFF', { depthTest: false });
+    this.countLabel = new TextLabel(labelMat, 0.42, 7);
     this.countLabel.renderOrder = 11;
-    this.countPill = new THREE.Mesh(new THREE.BoxGeometry(1, 0.55, 0.05), this.countMat);
+    this.countPill = new Pill(this.countMat, 0.7, new THREE.MeshBasicMaterial({ color: '#FFFFFF', depthTest: false }));
     this.countMat.depthTest = false;
     this.countPill.renderOrder = 10;
     this.countGroup.add(this.countPill, this.countLabel);
@@ -273,7 +274,7 @@ export class GameController {
       this.lastCount = s.count;
       const txt = formatCount(s.count);
       this.countLabel.setText(txt);
-      this.countPill.scale.set(Math.max(0.75, txt.length * 0.48 + 0.35), 1, 1);
+      this.countPill.setWidth(Math.max(0.9, this.countLabel.width + 0.45));
     }
     const showCount = s.count > 0 && this.camMode !== 'showcase' && this.camMode !== 'menu' && s.phase !== 'won';
     this.countGroup.visible = showCount;

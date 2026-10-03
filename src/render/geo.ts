@@ -138,3 +138,47 @@ export function disposeObject(root: THREE.Object3D, keep?: Set<unknown>) {
     }
   });
 }
+
+/**
+ * Rounded "pill" badge (flat), resizable without distorting its round ends:
+ * two half-discs + a middle quad, repositioned by setWidth().
+ */
+export class Pill extends THREE.Group {
+  private left: THREE.Mesh;
+  private right: THREE.Mesh;
+  private mid: THREE.Mesh;
+  private border: THREE.Mesh[] = [];
+  constructor(material: THREE.Material, readonly h = 0.62, borderMat?: THREE.Material) {
+    super();
+    const r = h / 2;
+    const cap = new THREE.CircleGeometry(r, 18);
+    const quad = new THREE.PlaneGeometry(1, h);
+    this.left = new THREE.Mesh(cap, material);
+    this.right = new THREE.Mesh(cap, material);
+    this.mid = new THREE.Mesh(quad, material);
+    if (borderMat) {
+      const bcap = new THREE.CircleGeometry(r + 0.06, 18);
+      const bquad = new THREE.PlaneGeometry(1, h + 0.12);
+      this.border = [new THREE.Mesh(bcap, borderMat), new THREE.Mesh(bcap, borderMat), new THREE.Mesh(bquad, borderMat)];
+      for (const b of this.border) {
+        b.position.z = -0.01;
+        b.renderOrder = 9;
+        this.add(b);
+      }
+    }
+    for (const m of [this.left, this.right, this.mid]) m.renderOrder = 10;
+    this.add(this.left, this.right, this.mid);
+    this.setWidth(1);
+  }
+  setWidth(w: number) {
+    const inner = Math.max(0.01, w - this.h);
+    this.mid.scale.x = inner;
+    this.left.position.x = -inner / 2;
+    this.right.position.x = inner / 2;
+    if (this.border.length) {
+      this.border[0].position.x = -inner / 2;
+      this.border[1].position.x = inner / 2;
+      this.border[2].scale.x = inner;
+    }
+  }
+}

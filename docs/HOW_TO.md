@@ -7,8 +7,9 @@ Everything content-related is data or a small pure function. After any change ru
 Base worlds live in `BASE_THEMES` (`src/core/worlds.ts`):
 1. Add an entry: `id`, `name`/`tagline` (en/fr), `colors` (sky, fog, floor tiles, rail, wall, accent, UI
    gradient), `introduces` (mechanics first featured there), `music` mood.
-2. Add its decor props in `themeProps()` (`src/render/decor.ts`) — a `DecorKind` case returning 2–3 props made
-   of primitives.
+2. Add its environment kit in `kitFor()` (`src/render/environment/kits.ts`): ground style/colors, `near` / `mid` /
+   `far` prop lists (primitives with baked colors, front facing +X, optional unlit `glow` parts), sky and track
+   edge style. The builder places, mirrors, instances and keeps props off the track automatically.
 3. Optionally add a themed skin with `unlock: { type: 'world', world: N }` (`src/meta/skins.ts`).
 Remix worlds (all worlds after the base list) are automatic: palette shift + mutators.
 
@@ -63,3 +64,7 @@ Add it to `PRODUCTS` (`src/services/iap/catalog.ts`), create the same ID in App 
 ## Add a sound
 Add a synth recipe in `scripts/gen-audio.js`, run `node scripts/gen-audio.js`, register it in `SFX`
 (`src/services/audio.ts`), then `audio.play('id')`.
+
+## Add a 3D text glyph
+In-game 3D text uses Lilita One converted by `node scripts/gen-font.js` into `src/render/fonts/lilita.json`
+(only the characters listed in `CHARS`). Add the character to `CHARS` and re-run the script.

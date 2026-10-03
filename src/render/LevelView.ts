@@ -8,9 +8,10 @@ import { getWorld, type ThemeColors } from '../core/worlds';
 import { RIVAL_LOOK } from '../meta/skins';
 import { characterGeometry, STRAGGLER_LOOK } from './characters';
 import { CrowdView } from './CrowdView';
-import { themeProps, toiletProp } from './decor';
-import { disposeObject, mergeParts, skyDome, type Part } from './geo';
-import { bakeText, VoxelLabel } from './voxelFont';
+import { buildEnvironment, GROUND_Y } from './environment/build';
+import { toiletProp } from './environment/kits';
+import { disposeObject, mergeParts, Pill, skyDome, type Part } from './geo';
+import { bakeText, TextLabel, textMaterial } from './text3d';
 
 const HALF = TRACK.width / 2;
 export const GATE_COLORS: Record<GateTone, string> = { good: '#2FA8FF', bad: '#FF4D5E', mystery: '#A66BFF', cond: '#FFB020' };
@@ -32,7 +33,7 @@ const ZERO = new THREE.Vector3(0, 0, 0);
 interface GateVisual {
   row: GateRowDef;
   group: THREE.Group;
-  panels: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; base: THREE.Color; label: VoxelLabel; small?: VoxelLabel; gateIndex: number; phase: number }[];
+  panels: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; base: THREE.Color; label: TextLabel; small?: TextLabel; gateIndex: number; phase: number }[];
   taken: number; // gate index taken, -1 none, -2 missed
   anim: number;
 }
@@ -46,7 +47,7 @@ export class LevelView extends THREE.Group {
   readonly colors: ThemeColors;
   private dyn: Dyn[] = [];
   private gates: GateVisual[] = [];
-  private rivals = new Map<number, { view: CrowdView; label: VoxelLabel; pill: THREE.Mesh; lastCount: number }>();
+  private rivals = new Map<number, { view: CrowdView; label: TextLabel; pill: Pill; lastCount: number }>();
   private pickups = new Map<number, THREE.Object3D>();
   private coinMesh: THREE.InstancedMesh | null = null;
   private coinIds: number[] = [];
@@ -57,26 +58,40 @@ export class LevelView extends THREE.Group {
   private darkLabelMat: THREE.MeshBasicMaterial;
   private lambert: THREE.MeshLambertMaterial;
   readonly sky: THREE.Mesh;
+  private skyExtras: THREE.Group | null = null;
 
   constructor(readonly def: LevelDef) {
     super();
     const world = getWorld(def.world);
     this.colors = world.colors;
     this.lambert = new THREE.MeshLambertMaterial({ vertexColors: true });
-    this.labelMat = new THREE.MeshBasicMaterial({ color: '#FFFFFF' });
-    this.darkLabelMat = new THREE.MeshBasicMaterial({ color: '#1D2340' });
+    this.labelMat = textMaterial('#FFFFFF');
+    this.darkLabelMat = textMaterial('#2B3566');
     this.sky = skyDome(this.colors.skyTop, this.colors.skyBottom);
     this.add(this.sky);
 
     const statics: Part[] = [];
     this.buildTrack(statics);
-    this.buildDecor(statics, world.theme.id);
     this.buildFinish(statics);
     for (const o of def.obstacles) this.buildObstacle(o, statics);
     const staticMesh = new THREE.Mesh(mergeParts(statics), this.lambert);
     staticMesh.matrixAutoUpdate = false;
     this.add(staticMesh);
     for (const s of statics) s.geo.dispose();
+
+    const lastStall = stallZ(def, def.finish.multipliers.length - 1);
+    const env = buildEnvironment({
+      kind: world.theme.id,
+      colors: this.colors,
+      seed: def.seed,
+      zStart: -70,
+      zEnd: lastStall + 90,
+      finishZ: def.finish.z,
+      lastStallZ: lastStall,
+    });
+    this.add(env.group);
+    this.skyExtras = env.sky;
+    this.add(env.sky);
 
     for (const row of def.gateRows) this.buildGateRow(row);
     this.buildPickups();
@@ -95,7 +110,8 @@ export class LevelView extends THREE.Group {
     const col: number[] = [];
     const nor: number[] = [];
     const a = new THREE.Color(this.colors.tileA);
-    const b = new THREE.Color(this.colors.tileB);
+    // Softer checker: the track is a stage, not the star.
+    const b = new THREE.Color(this.colors.tileB).lerp(a, 0.35);
     for (let iz = 0; iz < nz; iz++) {
       for (let ix = 0; ix < nx; ix++) {
         const x0 = -HALF + ix * tile;
@@ -117,44 +133,30 @@ export class LevelView extends THREE.Group {
     out.push({ geo: g, color: null });
     const len = end - start;
     const mid = wz((start + end) / 2);
-    // Platform body + rails
-    out.push({ geo: B(TRACK.width + 0.6, 1.4, len), color: this.colors.wall, pos: [0, -0.71, mid] });
-    out.push({ geo: B(0.3, 0.32, len), color: this.colors.rail, pos: [-HALF - 0.15, 0.16, mid] });
-    out.push({ geo: B(0.3, 0.32, len), color: this.colors.rail, pos: [HALF + 0.15, 0.16, mid] });
-    // Ground far below (depth cue, fades in fog)
-    out.push({ geo: B(220, 0.5, len + 200), color: new THREE.Color(this.colors.fog).multiplyScalar(0.85).getStyle(), pos: [0, -9, mid] });
-    // Start arch
-    for (const sx of [-1, 1]) out.push({ geo: B(0.5, 3.6, 0.5), color: this.colors.accent, pos: [sx * (HALF + 0.3), 1.8, wz(2)] });
-    out.push({ geo: B(TRACK.width + 1.1, 0.7, 0.5), color: this.colors.accent, pos: [0, 3.6, wz(2)] });
-    const startLabel = bakeText('START', this.labelMat, 0.075);
-    startLabel.position.set(0, 3.6, wz(2) + 0.3);
-    this.add(startLabel);
-  }
-
-  private buildDecor(out: Part[], kind: ReturnType<typeof getWorld>['theme']['id']) {
-    const props = themeProps(kind, this.colors);
-    const end = this.def.finish.z + TRACK.finishLength;
-    let k = 0;
-    for (let z = -20; z < end; z += 10, k++) {
-      for (const side of [-1, 1]) {
-        const prop = props[(k + (side > 0 ? 1 : 0)) % props.length];
-        const x = side * (HALF + 2.4 + ((k * 7) % 3) * 0.4);
-        const rotY = side > 0 ? Math.PI : 0;
-        for (const p of prop) {
-          const px = p.pos?.[0] ?? 0;
-          const pz = p.pos?.[2] ?? 0;
-          out.push({
-            geo: p.geo,
-            color: p.color,
-            // Prop-local +x points away from the track on both sides.
-            pos: [x + px * side, p.pos?.[1] ?? 0, wz(z) + pz],
-            rot: [p.rot?.[0] ?? 0, (p.rot?.[1] ?? 0) + rotY, p.rot?.[2] ?? 0],
-            scale: p.scale,
-          });
+    // Track dressing: colored edge bands + painted forward chevrons (speed cue).
+    for (const side of [-1, 1]) {
+      out.push({ geo: B(0.55, 0.02, len), color: this.colors.accent, pos: [side * (HALF - 0.3), 0.012, mid] });
+      out.push({ geo: B(0.12, 0.022, len), color: '#FFFFFF', pos: [side * (HALF - 0.68), 0.013, mid] });
+    }
+    const chevron = new THREE.Color(this.colors.tileA).lerp(new THREE.Color(this.colors.accent), 0.35).getStyle();
+    for (let z = 12; z < this.def.finish.z - 4; z += 18) {
+      if (this.def.gateRows.some((r) => Math.abs(r.z - z) < 4)) continue;
+      for (const k of [0, 1]) {
+        for (const side of [-1, 1]) {
+          out.push({ geo: B(1.7, 0.02, 0.45), color: chevron, pos: [side * 0.62, 0.014, wz(z + k * 1.2)], rot: [0, side * 0.55, 0] });
         }
       }
     }
-    for (const prop of props) for (const p of prop) p.geo.dispose();
+    // Platform body + rails
+    out.push({ geo: B(TRACK.width + 0.6, -GROUND_Y, len), color: this.colors.wall, pos: [0, GROUND_Y / 2 - 0.005, mid] });
+    out.push({ geo: B(0.3, 0.32, len), color: this.colors.rail, pos: [-HALF - 0.15, 0.16, mid] });
+    out.push({ geo: B(0.3, 0.32, len), color: this.colors.rail, pos: [HALF + 0.15, 0.16, mid] });
+    // Start arch
+    for (const sx of [-1, 1]) out.push({ geo: B(0.5, 3.6, 0.5), color: this.colors.accent, pos: [sx * (HALF + 0.3), 1.8, wz(2)] });
+    out.push({ geo: B(TRACK.width + 1.1, 0.7, 0.5), color: this.colors.accent, pos: [0, 3.6, wz(2)] });
+    const startLabel = bakeText('START', this.labelMat, 0.62);
+    startLabel.position.set(0, 3.6, wz(2) + 0.3);
+    this.add(startLabel);
   }
 
   /* ---------------- finish: the stalls corridor ---------------- */
@@ -170,7 +172,7 @@ export class LevelView extends THREE.Group {
     }
     for (const sx of [-1, 1]) out.push({ geo: B(0.5, 4.2, 0.5), color: '#FFD54F', pos: [sx * (HALF + 0.3), 2.1, zLine] });
     out.push({ geo: B(TRACK.width + 1.1, 0.9, 0.5), color: '#FFD54F', pos: [0, 4.2, zLine] });
-    const fl = bakeText('FINISH', this.darkLabelMat, 0.09);
+    const fl = bakeText('FINISH', this.darkLabelMat, 0.66);
     fl.position.set(0, 4.2, zLine + 0.3);
     this.add(fl);
 
@@ -190,7 +192,7 @@ export class LevelView extends THREE.Group {
       // Multiplier signs sit on the roof edge of each cubicle, facing the camera.
       const text = 'x' + (Number.isInteger(m) ? m : m.toFixed(1));
       for (const side of [-1, 1]) {
-        const lab = bakeText(text, this.labelMat, 0.075);
+        const lab = bakeText(text, this.labelMat, 0.5);
         lab.position.set(side * (HALF - 1.1), 2.95, z + 1.68);
         this.add(lab);
         out.push({ geo: B(2.1, 0.75, 0.12), color: '#1D2340', pos: [side * (HALF - 1.1), 2.95, z + 1.55] });
@@ -221,12 +223,12 @@ export class LevelView extends THREE.Group {
       const mesh = new THREE.Mesh(B(w - 0.18, 2.3, 0.12), mat);
       mesh.position.set(cx, 1.25, 0);
       group.add(mesh);
-      const label = new VoxelLabel(this.labelMat, 0.13, 5);
+      const label = new TextLabel(this.labelMat, 1.0, 5);
       label.position.set(cx, 1.45, 0.12);
       group.add(label);
-      let small: VoxelLabel | undefined;
+      let small: TextLabel | undefined;
       if (g.op.kind === 'cond') {
-        small = new VoxelLabel(this.labelMat, 0.055, 10);
+        small = new TextLabel(this.labelMat, 0.36, 10);
         small.position.set(cx, 0.55, 0.12);
         group.add(small);
       }
@@ -422,7 +424,7 @@ export class LevelView extends THREE.Group {
         const mesh = new THREE.Mesh(mergeParts(parts), this.lambert);
         for (const p of parts) p.geo.dispose();
         g.add(mesh);
-        const lab = bakeText('-' + formatCount(o.hp ?? 0), new THREE.MeshBasicMaterial({ color: '#FF4D5E' }), 0.08);
+        const lab = bakeText('-' + formatCount(o.hp ?? 0), textMaterial('#FF4D5E'), 0.6);
         lab.position.set(0, 1.75, 0);
         g.add(lab);
         this.add(g);
@@ -438,8 +440,8 @@ export class LevelView extends THREE.Group {
         for (const p of parts) p.geo.dispose();
         arms.add(mesh);
         this.add(arms);
-        const mat = new THREE.MeshBasicMaterial({ color: '#FF4D5E' });
-        const label = bakeText(formatCount(o.hp ?? 0) + '+', mat, 0.1);
+        const mat = textMaterial('#FF4D5E');
+        const label = bakeText(formatCount(o.hp ?? 0) + '+', mat, 0.7);
         label.position.set(o.x, 2.0, z);
         this.add(label);
         out.push({ geo: B(o.w * 2, 0.85, 0.12), color: '#263238', pos: [o.x, 2.0, z - 0.1] });
@@ -480,7 +482,7 @@ export class LevelView extends THREE.Group {
         parts.push({ geo: C(0.95, 0.95, 0.06, 20), color: '#FFFFFF', pos: [0, 0.03, 0] });
         const mesh = new THREE.Mesh(mergeParts(parts), this.lambert);
         g.add(mesh);
-        const lab = bakeText('+' + formatCount(p.amount), new THREE.MeshBasicMaterial({ color: '#2BD47D' }), 0.085);
+        const lab = bakeText('+' + formatCount(p.amount), textMaterial('#2BD47D'), 0.6);
         lab.position.set(0, 1.35, 0);
         g.add(lab);
         this.add(g);
@@ -505,7 +507,6 @@ export class LevelView extends THREE.Group {
   }
 
   private buildRivals() {
-    const pillGeo = B(1.1, 0.42, 0.08);
     for (const r of this.def.rivals) {
       const view = new CrowdView(RIVAL_LOOK, r.boss ? 'rival-boss' : 'rival', r.boss ? 1.15 : 1);
       view.setFacing(Math.PI, true);
@@ -514,9 +515,10 @@ export class LevelView extends THREE.Group {
       view.snap(m);
       view.mode = 'idle';
       this.add(view);
-      const pill = new THREE.Mesh(pillGeo, new THREE.MeshBasicMaterial({ color: '#E5383B' }));
-      const label = new VoxelLabel(this.labelMat, 0.055, 6);
+      const pill = new Pill(new THREE.MeshBasicMaterial({ color: '#E5383B' }), 0.6, new THREE.MeshBasicMaterial({ color: '#FFFFFF' }));
+      const label = new TextLabel(this.labelMat, 0.38, 6);
       label.setText(formatCount(r.count));
+      pill.setWidth(Math.max(0.8, label.width + 0.4));
       this.add(pill, label);
       this.rivals.set(r.id, { view, label, pill, lastCount: r.count });
     }
@@ -526,6 +528,9 @@ export class LevelView extends THREE.Group {
 
   update(sim: Simulation, dt: number, camera: THREE.Camera) {
     const t = sim.s.t;
+    // Sky follows the camera so long levels never leave the dome.
+    this.sky.position.set(camera.position.x, 0, camera.position.z);
+    this.skyExtras?.position.set(camera.position.x, 0, camera.position.z);
     for (const d of this.dyn) d.update(t, sim, dt);
 
     // Gates: timed swaps, moving rows, taken animation.
@@ -589,6 +594,7 @@ export class LevelView extends THREE.Group {
       if (rs.count !== v.lastCount) {
         v.lastCount = rs.count;
         v.label.setText(formatCount(rs.count));
+        v.pill.setWidth(Math.max(0.8, v.label.width + 0.4));
       }
       const top = rivalRadius(Math.max(1, rs.count)) * 0.15 + 1.25;
       v.pill.visible = v.label.visible = alive;
