@@ -27,7 +27,10 @@ export function shouldShowInterstitial(save: SaveData, now: number, opts: { supp
   if (opts.suppress) return false;
   if (save.level < cfg.minLevel) return false;
   if (save.ads.levelsSinceInterstitial < cfg.everyLevels) return false;
-  if (now - save.ads.lastInterstitialAt < cfg.cooldownMs) return false;
+  // A negative delay means the clock went back since the last ad (it was wrong at the
+  // time): ignore it rather than freezing interstitials until that date.
+  const since = now - save.ads.lastInterstitialAt;
+  if (since >= 0 && since < cfg.cooldownMs) return false;
   return true;
 }
 

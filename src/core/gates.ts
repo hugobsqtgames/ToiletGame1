@@ -1,4 +1,5 @@
 import { CROWD } from './config';
+import { formatCount } from './format';
 import type { GateDef, GateOp, SimpleGateOp } from './types';
 
 /** Applies a gate operation to a crowd count. Result is an integer in [0, maxCount]. */
@@ -61,13 +62,16 @@ export function gateTone(op: GateOp): GateTone {
   return isPositive(op) ? 'good' : 'bad';
 }
 
+/** Big late-game values stay short on gate panels: 12500 → "12K". */
+const compact = (n: number) => (n >= 10_000 ? formatCount(n) : String(n));
+
 /** Short label text using glyphs supported by the voxel font. */
 export function opLabel(op: SimpleGateOp): string {
   switch (op.kind) {
     case 'add':
-      return `+${op.n}`;
+      return `+${compact(op.n)}`;
     case 'sub':
-      return `-${op.n}`;
+      return `-${compact(op.n)}`;
     case 'mul':
       return `x${op.n}`;
     case 'div':

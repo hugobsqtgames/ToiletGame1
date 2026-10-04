@@ -1,7 +1,7 @@
 import { niceRound } from '../core/math';
 import { hashString, Rng } from '../core/rng';
 import type { MetricId, MissionState, Reward, SaveData } from './save';
-import { dayKey, weekKey } from './time';
+import { dayDiff, dayKey, isValidWeekKey, ROLLBACK_WINDOW_DAYS, weekDiff, weekKey } from './time';
 
 /**
  * Missions: 3 daily + 3 weekly (seeded by date, so they're stable during the
@@ -63,8 +63,11 @@ export function refreshMissions(save: SaveData, now: number): SaveData {
   const wk = weekKey(now);
   let missions = save.missions;
   // Clock rolled back (device date changed): keep the current missions, never regenerate.
-  const rolledBackDay = missions.dailyKey !== null && dk < missions.dailyKey;
-  const rolledBackWeek = missions.weeklyKey !== null && wk < missions.weeklyKey;
+  // A small rollback keeps the current missions; a key far in the future (wrong clock
+  // at the time) or a corrupted key is replaced so missions never freeze.
+  const rolledBackDay = missions.dailyKey !== null && dk < missions.dailyKey && dayDiff(dk, missions.dailyKey) <= ROLLBACK_WINDOW_DAYS;
+  const rolledBackWeek =
+    missions.weeklyKey !== null && isValidWeekKey(missions.weeklyKey) && wk < missions.weeklyKey && weekDiff(wk, missions.weeklyKey) <= 1;
   if (!rolledBackDay && (missions.dailyKey !== dk || missions.daily.length === 0)) {
     missions = { ...missions, dailyKey: dk, daily: build(DAILY_POOL, hashString('d' + dk), save.level, 'd' + dk, false) };
   }

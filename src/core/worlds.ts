@@ -155,7 +155,7 @@ const ALL_MUTATORS: MutatorId[] = ['rushHour', 'butterfingers', 'rivalry', 'fogg
 
 /** Deterministic world description, valid for any world number (infinite). */
 export function getWorld(world: number): WorldInfo {
-  const w = Math.max(1, Math.floor(world));
+  const w = Number.isFinite(world) ? Math.max(1, Math.floor(world)) : 1;
   const themeIndex = (w - 1) % BASE_WORLD_COUNT;
   const cycle = Math.floor((w - 1) / BASE_WORLD_COUNT);
   const theme = BASE_THEMES[themeIndex];

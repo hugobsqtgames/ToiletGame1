@@ -1,6 +1,6 @@
 import { niceRound } from '../core/math';
 import type { Reward, SaveData } from './save';
-import { dayDiff, dayKey } from './time';
+import { dayDiff, dayKey, ROLLBACK_WINDOW_DAYS } from './time';
 
 /**
  * 7-day login calendar. Claiming on consecutive days advances the streak;
@@ -35,7 +35,9 @@ export function dailyStatus(save: SaveData, now: number): DailyStatus {
   const last = save.daily.lastClaimDay;
   if (!last) return { canClaim: true, dayIndex: 0, broken: false };
   const diff = dayDiff(last, today);
-  if (diff <= 0) return { canClaim: false, dayIndex: save.daily.streak % DAILY_CYCLE, broken: false };
+  // Already claimed today, or the clock was rolled back a little: refuse.
+  // (A claim dated far in the future comes from a wrong clock: treated as a broken streak.)
+  if (diff <= 0 && diff >= -ROLLBACK_WINDOW_DAYS) return { canClaim: false, dayIndex: save.daily.streak % DAILY_CYCLE, broken: false };
   if (diff === 1) return { canClaim: true, dayIndex: save.daily.streak % DAILY_CYCLE, broken: false };
   return { canClaim: true, dayIndex: 0, broken: true };
 }

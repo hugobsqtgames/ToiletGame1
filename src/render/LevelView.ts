@@ -11,6 +11,7 @@ import { CrowdView } from './CrowdView';
 import { buildEnvironment, GROUND_Y } from './environment/build';
 import { toiletProp } from './environment/kits';
 import { disposeObject, mergeParts, Pill, skyDome, type Part } from './geo';
+import { gateLabelScale } from './labelFit';
 import { bakeText, TextLabel, textMaterial } from './text3d';
 
 const HALF = TRACK.width / 2;
@@ -33,7 +34,7 @@ const ZERO = new THREE.Vector3(0, 0, 0);
 interface GateVisual {
   row: GateRowDef;
   group: THREE.Group;
-  panels: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; base: THREE.Color; label: TextLabel; small?: TextLabel; gateIndex: number; phase: number }[];
+  panels: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; base: THREE.Color; label: TextLabel; small?: TextLabel; gateIndex: number; phase: number; /** Label scale that fits the panel. */ fit: number; fitSmall: number }[];
   taken: number; // gate index taken, -1 none, -2 missed
   anim: number;
 }
@@ -232,7 +233,7 @@ export class LevelView extends THREE.Group {
         small.position.set(cx, 0.55, 0.12);
         group.add(small);
       }
-      vis.panels.push({ mesh, mat, base: new THREE.Color(), label, small, gateIndex: gi, phase: -1 });
+      vis.panels.push({ mesh, mat, base: new THREE.Color(), label, small, gateIndex: gi, phase: -1, fit: 1, fitSmall: 1 });
       this.applyGateLook(vis.panels[vis.panels.length - 1], row, 0);
       pillarParts.push({ geo: B(0.22, 2.6, 0.32), color: '#FFFFFF', pos: [g.x0 + 0.05, 1.3, 0] });
       pillarParts.push({ geo: B(0.22, 2.6, 0.32), color: '#FFFFFF', pos: [g.x1 - 0.05, 1.3, 0] });
@@ -255,8 +256,16 @@ export class LevelView extends THREE.Group {
     p.base.set(op.kind === 'mul' ? MUL_COLOR : GATE_COLORS[tone]);
     p.mat.color.copy(p.base);
     const lines = gateLabelLines(op);
+    const panel = gate.x1 - gate.x0 - 0.18;
     p.label.setText(lines.big);
-    if (p.small) p.small.setText(`${lines.small ?? ''} ${lines.small2 ?? ''}`.trim().replace('ELSE ', '/'));
+    p.fit = gateLabelScale(lines.big, panel, 1.0);
+    p.label.scale.setScalar(p.fit);
+    if (p.small) {
+      const small = `${lines.small ?? ''} ${lines.small2 ?? ''}`.trim().replace('ELSE ', '/');
+      p.small.setText(small);
+      p.fitSmall = gateLabelScale(small, panel, 0.36);
+      p.small.scale.setScalar(p.fitSmall);
+    }
     if (gate.timed) p.mat.opacity = phase === 0 ? 0.78 : 0.6;
   }
 
@@ -548,13 +557,13 @@ export class LevelView extends THREE.Group {
             p.mat.opacity = 0.68 * (1 - g.anim * 0.7);
             // Pop then vanish: the passed gate must not loom in front of the camera.
             const k = g.anim < 0.3 ? 1 + g.anim : Math.max(0.001, 1.3 * (1 - (g.anim - 0.3) / 0.7));
-            p.label.scale.setScalar(k);
-            if (p.small) p.small.scale.setScalar(k);
+            p.label.scale.setScalar(k * p.fit);
+            if (p.small) p.small.scale.setScalar(k * p.fitSmall);
           } else {
             const s = Math.max(0.001, 1 - g.anim);
             p.mesh.scale.set(1, s, 1);
-            p.label.scale.setScalar(s);
-            if (p.small) p.small.scale.setScalar(s);
+            p.label.scale.setScalar(s * p.fit);
+            if (p.small) p.small.scale.setScalar(s * p.fitSmall);
           }
         }
       }

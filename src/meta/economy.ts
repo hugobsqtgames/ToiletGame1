@@ -20,15 +20,20 @@ export const levelBase = (level: number) => 20 + 2.2 * Math.pow(Math.max(1, leve
 
 /** Coins for a victory, before optional rewarded-ad tripling. */
 export function victoryCoins(level: number, finishCount: number, multiplier: number, incomeLvl: number): number {
-  const crowdFactor = 1 + 0.6 * Math.log2(1 + Math.max(0, finishCount) / 10);
+  const crowdFactor = 1 + 0.6 * Math.log2(1 + fin(finishCount) / 10);
   // Stall multiplier is damped (x10 pays ~x5) so perfect runs feel great without inflating the economy.
-  const stall = Math.pow(Math.max(1, multiplier), 0.7);
+  const stall = Math.pow(Math.max(1, fin(multiplier)), 0.7);
   return Math.max(1, Math.round(levelBase(level) * crowdFactor * stall * incomeMultiplier(incomeLvl)));
 }
 
 /** Consolation coins after a defeat, proportional to distance travelled. */
 export function defeatCoins(level: number, progress: number, incomeLvl: number): number {
-  return Math.max(1, Math.round(levelBase(level) * 0.35 * Math.min(1, Math.max(0, progress)) * incomeMultiplier(incomeLvl)));
+  return Math.max(1, Math.round(levelBase(level) * 0.35 * Math.min(1, fin(progress)) * incomeMultiplier(incomeLvl)));
+}
+
+/** Non-negative finite number (NaN/negative → 0) so a bad input can never yield NaN coins. */
+function fin(v: number): number {
+  return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
 /** Members granted by the revive (second chance). */

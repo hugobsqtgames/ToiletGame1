@@ -20,6 +20,8 @@ const HALF = TRACK.width / 2;
 const SEED_SALT = 0x10051;
 export const FINISH_MULTIPLIERS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 7, 10];
 export const BASE_START_COUNT = 5;
+/** Highest level number the generator accepts (same bound as the save sanitizer). */
+export const MAX_LEVEL = 100_000_000;
 
 interface Gen {
   rng: Rng;
@@ -54,7 +56,8 @@ export interface GenOptions {
 }
 
 export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
-  const L = Math.max(1, Math.floor(level));
+  // Corrupted input (NaN/Infinity) must never crash the game: fall back to a valid level.
+  const L = Number.isFinite(level) ? Math.min(MAX_LEVEL, Math.max(1, Math.floor(level))) : level > 0 ? MAX_LEVEL : 1;
   const world = worldOfLevel(L);
   const info = getWorld(world);
   const mutators = [...info.mutators, ...(opts.extraMutators ?? [])];
@@ -115,7 +118,16 @@ export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
   }
 
   if (isBoss) {
-    g.z = Math.max(g.z, length - 30);
+    // The boss always stands at a fixed spot before the finish corridor (the last
+    // pattern may overshoot endZ; the corridor filter below used to delete the boss).
+    // Its runway is cleared so the fight is readable.
+    const bz = length - 30;
+    const clear = bz - 2;
+    g.rows = g.rows.filter((r) => r.z < clear);
+    g.obstacles = g.obstacles.filter((o) => o.z + (o.kind === 'roller' ? 0 : o.d) < clear);
+    g.pickups = g.pickups.filter((p) => p.z < clear);
+    g.rivals = g.rivals.filter((r) => r.z < clear);
+    g.z = bz;
     rivalPattern(g, true);
   }
 
@@ -139,7 +151,10 @@ export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
     stepCost: Math.max(1, Math.round(Efinish / (FINISH_MULTIPLIERS.length - 1))),
   };
 
-  const mechanics = [...g.used];
+  // Announce exactly what the level contains ("NEW!" cards): patterns may have been
+  // trimmed by the corridor filter, and dilemma rows can contain more ops than declared.
+  const present = presentMechanics(g);
+  const mechanics = [...[...g.used].filter((m) => present.has(m)), ...[...present].filter((m) => !g.used.has(m))];
   const def: LevelDef = {
     level: L,
     seed,
@@ -167,6 +182,31 @@ export function generateLevel(level: number, opts: GenOptions = {}): LevelDef {
 /* ------------------------------------------------------------------ */
 /* Patterns                                                            */
 /* ------------------------------------------------------------------ */
+
+function presentMechanics(g: Pick<Gen, 'rows' | 'obstacles' | 'rivals' | 'pickups'>): Set<MechanicId> {
+  const out = new Set<MechanicId>();
+  const simple = (op: { kind: string }) => out.add(`gate_${op.kind}` as MechanicId);
+  for (const r of g.rows) {
+    if (r.moving) out.add('gate_moving');
+    for (const gate of r.gates) {
+      const op = gate.op;
+      if (op.kind === 'mystery') out.add('gate_mystery');
+      else if (op.kind === 'cond') {
+        out.add('gate_cond');
+        simple(op.below);
+        simple(op.above);
+      } else simple(op);
+      if (gate.timed) {
+        out.add('gate_timed');
+        simple(gate.timed.alt);
+      }
+    }
+  }
+  for (const o of g.obstacles) out.add(o.kind as MechanicId);
+  if (g.rivals.length) out.add('rival');
+  if (g.pickups.some((p) => p.kind === 'stragglers')) out.add('pickup');
+  return out;
+}
 
 function markUsed(g: Gen, ...m: MechanicId[]) {
   for (const x of m) g.used.add(x);

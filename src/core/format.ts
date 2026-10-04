@@ -1,6 +1,7 @@
 /** Compact number formatting used across HUD and menus: 950, 1.2K, 34K, 1.5M. */
 export function formatCount(n: number): string {
-  const v = Math.max(0, Math.floor(n));
+  // NaN/Infinity must never reach the HUD ("NaNB" was possible before).
+  const v = Number.isNaN(n) ? 0 : Math.max(0, Math.floor(Math.min(n, 999e9)));
   if (v < 1000) return String(v);
   if (v < 10_000) return trim((v / 1000).toFixed(1)) + 'K';
   if (v < 1_000_000) return Math.floor(v / 1000) + 'K';

@@ -126,7 +126,8 @@ export class Simulation {
 
   constructor(level: LevelDef, startBonus = 0, state?: SimState) {
     this.level = level;
-    const start = Math.max(1, level.startCount + startBonus);
+    const bonus = Number.isFinite(startBonus) ? startBonus : 0;
+    const start = clamp(Math.floor(level.startCount + bonus), 1, CROWD.maxCount);
     this.s = state ?? {
       t: 0,
       phase: 'ready',
@@ -181,10 +182,12 @@ export class Simulation {
 
   /** Relative steering (finger delta in meters). */
   moveTarget(dx: number) {
+    if (this.finished || !Number.isFinite(dx)) return;
     this.s.targetX = this.clampX(this.s.targetX + dx);
   }
 
   setTarget(x: number) {
+    if (this.finished || Number.isNaN(x)) return;
     this.s.targetX = this.clampX(x);
   }
 
@@ -232,12 +235,20 @@ export class Simulation {
     if (!this.canRevive()) return;
     const s = this.s;
     s.revived = true;
-    s.count = Math.max(1, Math.floor(count));
+    s.count = Number.isFinite(count) ? clamp(Math.floor(count), 1, CROWD.maxCount) : 1;
+    // Fresh formation: the dead slots of the wiped crowd must not hide the revived one.
+    this.relayout();
+    if (s.count > s.stats.peak) s.stats.peak = s.count;
     if (s.activeRival >= 0) s.rivals[s.activeRival].defeated = true;
     s.activeRival = -1;
     s.graceUntil = s.t + CROWD.reviveGrace;
     s.phase = s.z >= this.level.finish.z ? 'finish' : 'running';
     this.emit({ type: 'revived', count: s.count });
+    if (s.phase === 'finish' && s.finishCount <= 0) {
+      // Died on the very step that crossed the line: the finish starts now.
+      s.finishCount = s.count;
+      this.emit({ type: 'finishLine', count: s.count });
+    }
   }
 
   drainEvents(): SimEvent[] {
@@ -251,6 +262,7 @@ export class Simulation {
   }
 
   private clampX(x: number) {
+    if (Number.isNaN(x)) return Number.isNaN(this.s.x) ? 0 : this.s.x;
     const lim = Math.max(0, HALF - this.radius * 0.92);
     return clamp(x, -lim, lim);
   }
@@ -260,6 +272,9 @@ export class Simulation {
   step(dt: number) {
     const s = this.s;
     if (s.phase === 'ready' || s.phase === 'won' || s.phase === 'lost') return;
+    // A hostile frame time (NaN, negative, huge hitch) must never corrupt the state.
+    if (!(dt > 0)) return;
+    dt = Math.min(dt, 0.1);
     s.t += dt;
     if (s.phase === 'battle') return this.stepBattle(dt);
     if (s.phase === 'finish') return this.stepFinish(dt);

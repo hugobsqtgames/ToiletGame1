@@ -1,6 +1,6 @@
 import type { MechanicId } from '../core/types';
 import { DEFAULT_SKIN, isSkinId } from './skins';
-import { isValidDayKey } from './time';
+import { isValidDayKey, isValidWeekKey } from './time';
 
 /**
  * Save data schema, defaults, validation and migrations. Persistence itself is
@@ -221,7 +221,7 @@ export function sanitizeSave(raw: unknown, now: number): SaveData {
     missions: {
       dailyKey: dayOrNull(missions.dailyKey),
       daily: sanitizeMissions(missions.daily),
-      weeklyKey: typeof missions.weeklyKey === 'string' ? missions.weeklyKey : null,
+      weeklyKey: isValidWeekKey(missions.weeklyKey) ? missions.weeklyKey : null,
       weekly: sanitizeMissions(missions.weekly),
       achievements: ach,
     },
