@@ -1,6 +1,6 @@
 # QA, audit & known limitations
 
-## Automated tests (`npm test`, 37 tests)
+## Automated tests (`npm test`, 1,403 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
 * **Gates**: every operation, clamping at 9,999,999, timed gates, labels.
 * **Level generation**: deterministic per seed; not a modulo loop (levels n and n+10/20/40/80/800 differ);
   levels 1–3000 + 10 000, 123 456, 9 999 999 are all valid (finite numbers, bounds, rivals > 0, finish corridor
@@ -24,7 +24,29 @@ through the test-ad overlay; level 25 (Airport) with upgrades; injected high-lev
 Balancing: `npm run balance` (planner win rates: 100% levels 2–80, ~95% 100–140, ~78% 200–240, ~72% 1000+,
 90–100% with a revive; random bot ≈ 0–40%).
 
-## Audit findings fixed
+## Stress battery & UI monkey (latest run)
+* Jest: **1,403 / 1,403 passing** (7 suites). Lint and typecheck clean.
+* UI monkey on the production web build: ~6,000 random actions over 9 sessions (fresh installs, level-25/57 and
+  world-8 saves; random taps, triple taps, drags, background/foreground, 70+ page reloads mid-run; a "realistic
+  player" mode that plays runs to victory/defeat/revive/battles). **0 page errors, 0 NaN/undefined on screen,
+  0 corrupted saves, 0 stuck runs**; JS heap stays 20–60 MB (no leak across reloads and levels).
+  Only finding: expo-audio's *web* player calls `HTMLMediaElement.play()` without handling its rejection
+  (autoplay policy / play-pause race) → harmless unhandled rejections on web only (not on iOS).
+* iOS production bundle inspected: no `three.cjs`, no Node-only API, no debug hooks.
+
+## Audit findings fixed (stress battery)
+| Finding | Fix |
+|---|---|
+| Boss levels without a boss (20, 100, 110, 310…): boss placed past the corridor limit and filtered out | Fixed boss spot, runway cleared |
+| "NEW!" cards announced absent mechanics / missed present ones | Derived from the final level content |
+| Revived crowd invisible & untouchable ~0.45 s; peak not updated; NaN count; finish count 0 when dying on the line | Formation reset, clamps, finish restart |
+| Start bonus could exceed the 9,999,999 cap; NaN steering corrupted x; finished sim accepted input | Clamps & guards |
+| Weekly missions did not refresh for a week across DST in years starting on Monday (e.g. Paris, March 2029) | DST-proof `weekKey` |
+| A clock once far in the future locked daily rewards / missions / interstitials until that date; corrupted weekly key froze missions | 7-day rollback window, key validation |
+| `formatCount(NaN)` → "NaNB"; NaN coins possible; `generateLevel(NaN)` crashed | Input guards |
+| Late-game gate labels ("+19000") overflowed onto neighbouring gates | Labels fit their panel; compact values ≥ 10K |
+
+## Audit findings fixed (initial audit)
 | Finding | Fix |
 |---|---|
 | Formation refilled instantly after a hit → a wall ate the whole crowd | Persistent holes that close after 0.45 s |
