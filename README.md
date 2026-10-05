@@ -36,6 +36,7 @@ Release builds never simulate anything.
 | [docs/MONETIZATION.md](docs/MONETIZATION.md) | Ads (AdMob, consent, ATT, frequency rules), IAP (StoreKit 2 via expo-iap), IDs to configure |
 | [docs/APP_STORE.md](docs/APP_STORE.md) | iOS / EAS configuration, privacy, App Store publication checklist |
 | [docs/HOW_TO.md](docs/HOW_TO.md) | Add a world, level pattern, gate, obstacle, skin, reward, mission |
+| [docs/preview](docs/preview/README.md) | App Store preview video (EN/FR), real app footage, rebuild pipeline |
 | [docs/QA.md](docs/QA.md) | What was tested, how, audit findings and fixes, known limitations |
 | [docs/mockups/](docs/mockups/) | Final visual mockups made from the real app |
 

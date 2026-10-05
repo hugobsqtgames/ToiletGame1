@@ -42,3 +42,6 @@ yarn-error.*
 
 # mockup work dir
 .mockups/
+
+# promo video work dir
+.promo/

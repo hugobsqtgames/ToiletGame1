@@ -1,0 +1,551 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!--
+  LOO RUSH — App Store preview compositor.
+  Rendered frame by frame by scripts/promo/render.js: window.renderAt(t) lays out
+  every layer for time t (seconds), then the page is screenshotted.
+  Timeline is locked to the game's own music (music_game: 128 BPM, bar = 1.875 s).
+-->
+<style>
+@font-face { font-family: Lilita; src: url(fonts/LilitaOne_400Regular.ttf); }
+@font-face { font-family: Nunito; font-weight: 900; src: url(fonts/Nunito_900Black.ttf); }
+@font-face { font-family: Nunito; font-weight: 800; src: url(fonts/Nunito_800ExtraBold.ttf); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 886px; height: 1920px; overflow: hidden; background: #121735; }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+#bg { position: absolute; inset: -10%; }
+#rays { position: absolute; inset: -60%; background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,.045) 0 7deg, transparent 7deg 14deg); }
+#glow { position: absolute; inset: 0; background: radial-gradient(circle at 50% 38%, rgba(255,255,255,.18), transparent 55%); }
+.layer { position: absolute; inset: 0; will-change: transform, opacity, filter; }
+.full img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dev { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; background: #0b0b10; }
+.dev .scr { position: absolute; overflow: hidden; background: #000; }
+.dev .scr img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dev .scr .b { opacity: 0; }
+.dev .island { position: absolute; left: 50%; transform: translateX(-50%); background: #000; z-index: 3; }
+.dev .gloss { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(125deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0) 70%, rgba(255,255,255,.05) 100%); }
+.dev .btn { position: absolute; background: #3a3d4a; border-radius: 4px; }
+.head { position: absolute; left: 0; right: 0; text-align: center; font-family: Lilita; color: #fff; letter-spacing: 1px; line-height: 1.02;
+  text-shadow: 0 7px 0 #1a3fa8, 0 14px 34px rgba(8, 14, 50, .45); }
+.head .w { display: inline-block; white-space: pre; }
+.sub { position: absolute; left: 0; right: 0; text-align: center; font-family: Nunito; font-weight: 900; color: #fff; letter-spacing: .5px;
+  text-shadow: 0 3px 12px rgba(8, 14, 50, .5); }
+.chip { position: absolute; left: 50%; font-family: Lilita; font-size: 46px; color: #1d2340; background: #fff; border-radius: 40px; padding: 10px 34px 12px;
+  box-shadow: 0 10px 30px rgba(8,14,50,.35); white-space: nowrap; }
+.chip small { display: block; font-family: Nunito; font-weight: 800; font-size: 25px; color: #4a5275; margin-top: -2px; text-align: center; }
+#touch { position: absolute; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50%; background: rgba(255,255,255,.34);
+  box-shadow: 0 0 0 6px rgba(255,255,255,.55), 0 10px 30px rgba(0,0,0,.25); }
+#icon { position: absolute; left: 50%; border-radius: 22.5%; box-shadow: 0 30px 70px rgba(8,14,50,.5); overflow: hidden; }
+#icon img { width: 100%; height: 100%; display: block; }
+#cta { position: absolute; left: 50%; font-family: Lilita; color: #fff; font-size: 64px; padding: 20px 70px 26px; border-radius: 48px; white-space: nowrap;
+  background: linear-gradient(#4fe083, #3bd16f); box-shadow: 0 10px 0 #1f9c4c, 0 26px 50px rgba(8,14,50,.4); text-shadow: 0 4px 0 rgba(20,90,45,.55); }
+#devs { position: absolute; inset: 0; z-index: 2; }
+#touch { z-index: 9; }
+#texts { position: absolute; inset: 0; z-index: 10; }
+#icon, #cta { z-index: 11; }
+#vignette { z-index: 12; }
+#flash { z-index: 13; }
+#vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(8, 12, 40, .38) 100%); }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="mb" x="-20%" y="0" width="140%" height="100%"><feGaussianBlur id="mbx" stdDeviation="0 0" /></filter>
+</svg>
+<div id="stage">
+  <div id="bg"><div id="rays"></div><div id="glow"></div></div>
+  <div class="layer full" id="fullA"><img></div>
+  <div class="layer full" id="fullB"><img></div>
+  <div id="devs"></div>
+  <div id="touch"></div>
+  <div id="texts"></div>
+  <div id="icon"><img src="img/icon.png"></div>
+  <div id="cta"></div>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+<script>
+const Q = new URLSearchParams(location.search);
+const LANG = Q.get('lang') || 'en';
+const W = 886, H = 1920;
+const BPM = 128, BEAT = 60 / BPM, BAR = BEAT * 4;
+const DURATION = 899 / 30; // 29.97 s: two loops of the game music, under the 30 s App Store limit
+
+/* ---------------- copy (EN / FR). Lines marked * come straight from the app. ---------------- */
+const TXT = {
+  en: {
+    p1: 'Half-time.', p2: 'One restroom.',               // * Stadium Stampede tagline
+    hook: 'Everybody\ngotta go!',                        // * app tagline
+    sub: 'Swipe · Multiply · Rush',
+    swipe: 'Swipe to steer.', gate: 'Pick the right gate.',
+    dodge: 'Dodge the chaos.', rivals: 'Outnumber\nthe rivals.', finish: 'Rush to\nthe throne.',
+    worlds1: '8 worlds.', worlds2: 'Endless levels.',
+    skins: 'Collect skins.', chests: 'Open chests.',
+    tag: 'Everybody gotta go!', cta: 'PLAY FREE',
+  },
+  fr: {
+    p1: 'Mi-temps.', p2: 'Un seul WC.',                   // * tagline « Ruée au Stade »
+    hook: 'Tout le monde\ndoit y aller !',                // * slogan de l'app
+    sub: 'Glisse · Multiplie · Fonce',
+    swipe: 'Glisse pour diriger.', gate: 'Choisis la\nbonne porte.',
+    dodge: 'Évite le chaos.', rivals: 'Écrase\nles rivaux.', finish: 'Fonce vers\nle trône.',
+    worlds1: '8 mondes.', worlds2: 'Niveaux infinis.',
+    skins: 'Collectionne\nles skins.', chests: 'Ouvre des coffres.',
+    tag: 'Tout le monde doit y aller !', cta: 'JOUE GRATUIT',
+  },
+}[LANG];
+
+/* World names and UI colors from src/core/worlds.ts (real data, injected by render.js). */
+let WORLDS = [];
+let META = {};
+
+/* ---------------- easing ---------------- */
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eOut = (x) => 1 - Math.pow(1 - x, 3);
+const eOut5 = (x) => 1 - Math.pow(1 - x, 5);
+const eIn = (x) => x * x * x;
+const eInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const eInOut5 = (x) => (x < 0.5 ? 16 * Math.pow(x, 5) : 1 - Math.pow(-2 * x + 2, 5) / 2);
+const eBack = (x) => { const c1 = 1.25, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+/* ---------------- footage ---------------- */
+function frameOf(clip, f) {
+  const m = META[clip];
+  const n = clamp(Math.round(f), 1, m.frames);
+  return `clips/${clip}/${String(n).padStart(5, '0')}.jpg`;
+}
+const markFrame = (clip, label) => META[clip].marks.find((m) => m.label === label).frame + 1;
+/** First frame where the crowd passed z (hero86). */
+function zFrame(clip, z, from = 1) {
+  const st = META[clip].states;
+  for (let i = from - 1; i < st.length; i++) if (st[i][3] >= z) return i + 1;
+  return st.length;
+}
+function phaseFrame(clip, phase, from = 1) {
+  const st = META[clip].states;
+  for (let i = from - 1; i < st.length; i++) if (st[i][1] === phase) return i + 1;
+  return st.length;
+}
+
+/* ---------------- DOM helpers ---------------- */
+const $ = (id) => document.getElementById(id);
+const pending = [];
+/** Footage visible in the current frame (render.js derives the game SFX from it). */
+let VIS = [];
+function setImg(img, src) {
+  if (img.getAttribute('src') !== src) {
+    img.setAttribute('src', src);
+    pending.push(img.decode().catch(() => {}));
+  }
+}
+
+/* Full-bleed footage layers with a camera (scale/translate around a focus point). */
+function full(id, src, o = {}) {
+  const el = $(id);
+  if (!src) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  setImg(el.querySelector('img'), src);
+  VIS.push(src);
+  const s = o.scale ?? 1, fx = o.fx ?? W / 2, fy = o.fy ?? H / 2;
+  el.style.transformOrigin = `${fx}px ${fy}px`;
+  el.style.transform = `translate(${o.x ?? 0}px, ${o.y ?? 0}px) scale(${s})`;
+  el.style.opacity = o.opacity ?? 1;
+  el.style.filter = o.blur ? `url(#mb)` : 'none';
+  el.style.clipPath = o.clip ?? 'none';
+}
+
+/* Device: d = 0 → full-bleed screen, d = 1 → iPhone (frame from the mockup boards). */
+const devPool = [];
+function dev(i, o) {
+  let el = devPool[i];
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'dev';
+    el.innerHTML = '<div class="btn" data-k="l1"></div><div class="btn" data-k="l2"></div><div class="btn" data-k="r1"></div><div class="scr"><img class="a"><img class="b"><div class="gloss"></div></div><div class="island"></div>';
+    $('devs').appendChild(el);
+    devPool[i] = el;
+  }
+  if (!o) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const d = o.d ?? 1;
+  const ph = o.h ?? 1400; // phone height when d = 1
+  const k = ph / 1090;
+  const pw = 520 * k;
+  const w = lerp(W, pw, d), h = lerp(H, ph, d);
+  const pad = 18 * k * d;
+  const R = lerp(0, 86 * k, d);
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.borderRadius = R + 'px';
+  el.style.boxShadow = d > 0 ? `0 0 0 ${4 * k * d}px #3a3d4a, inset 0 0 0 ${2 * k * d}px #22242c, 0 ${70 * d}px ${130 * d}px rgba(6,10,40,${0.5 * d})` : 'none';
+  const cx = lerp(W / 2, o.x ?? W / 2, d), cy = lerp(H / 2, o.y ?? H / 2, d);
+  el.style.transform = `translate(${cx - w / 2}px, ${cy - h / 2}px) perspective(2400px) rotateX(${(o.rx ?? 0) * d}deg) rotateY(${(o.ry ?? 0) * d}deg) rotateZ(${(o.rz ?? 0) * d}deg) scale(${o.s ?? 1})`;
+  el.style.opacity = o.opacity ?? 1;
+  el.style.zIndex = o.z ?? 1;
+  const scr = el.querySelector('.scr');
+  scr.style.left = scr.style.top = pad + 'px';
+  scr.style.width = w - 2 * pad + 'px';
+  scr.style.height = h - 2 * pad + 'px';
+  scr.style.borderRadius = lerp(0, 70 * k, d) + 'px';
+  const isl = el.querySelector('.island');
+  isl.style.top = 22 * k + 'px';
+  isl.style.width = 150 * k + 'px';
+  isl.style.height = 44 * k + 'px';
+  isl.style.borderRadius = 24 * k + 'px';
+  isl.style.opacity = clamp(d * 3 - 2);
+  el.querySelector('.gloss').style.opacity = d;
+  for (const b of el.querySelectorAll('.btn')) {
+    const key = b.dataset.k;
+    b.style.opacity = clamp(d * 2 - 1);
+    b.style.width = 7 * k + 'px';
+    b.style.height = (key === 'r1' ? 160 : 110) * k + 'px';
+    b.style.left = key === 'r1' ? w + 'px' : -7 * k + 'px';
+    b.style.top = (key === 'l1' ? 250 : key === 'l2' ? 390 : 300) * k + 'px';
+  }
+  const [a, b] = scr.querySelectorAll('img');
+  if ((o.opacity ?? 1) > 0.3) VIS.push(o.src2 && (o.mix ?? 0) > 0.5 ? o.src2 : o.src);
+  setImg(a, o.src);
+  if (o.src2) { setImg(b, o.src2); b.style.opacity = o.mix ?? 0; } else b.style.opacity = 0;
+  // Content camera inside the screen (focus zooms).
+  const zs = o.zoom ?? 1;
+  for (const img of [a, b]) {
+    img.style.transformOrigin = `${(o.fx ?? 0.5) * 100}% ${(o.fy ?? 0.5) * 100}%`;
+    img.style.transform = `scale(${zs})`;
+  }
+}
+
+/* Kinetic headline: words rise in with a soft blur, staggered. */
+const textPool = [];
+let textUsed = 0;
+function head(str, t, tIn, tOut, o = {}) {
+  if (t < tIn || t > tOut + 0.4) return;
+  let el = textPool[textUsed];
+  if (!el) {
+    el = document.createElement('div');
+    $('texts').appendChild(el);
+    textPool[textUsed] = el;
+  }
+  textUsed++;
+  const cls = o.sub ? 'sub' : 'head';
+  // Long single lines shrink to keep a safe margin on both sides.
+  const longest = Math.max(...str.split('\n').map((l) => l.length));
+  const size = o.sub ? (o.size ?? 46) : Math.min(o.size ?? 118, Math.floor(1500 / Math.max(1, longest)));
+  const key = cls + size + str;
+  if (el.dataset.key !== key) {
+    el.dataset.key = key;
+    el.className = cls;
+    el.style.fontSize = size + 'px';
+    el.innerHTML = str.split('\n').map((line) => line.split(' ').map((w) => `<span class="w">${w}</span>`).join(' ')).join('<br>');
+  }
+  el.style.display = 'block';
+  el.style.top = (o.y ?? 210) + 'px';
+  el.style.color = o.color ?? '#fff';
+  const words = el.querySelectorAll('.w');
+  const out = eIn(prog(t, tOut, tOut + 0.28));
+  words.forEach((w, i) => {
+    const p = eOut5(prog(t, tIn + i * 0.07, tIn + i * 0.07 + 0.42));
+    w.style.opacity = p * (1 - out);
+    w.style.transform = `translateY(${(1 - p) * 46 - out * 30}px) scale(${lerp(0.92, 1, p)})`;
+    w.style.filter = p < 1 ? `blur(${(1 - p) * 10}px)` : out > 0 ? `blur(${out * 8}px)` : 'none';
+  });
+}
+
+function chip(title, subtitle, t, tIn, tOut, y) {
+  let el = $('chip');
+  if (!el) { el = document.createElement('div'); el.id = 'chip'; el.className = 'chip'; $('texts').appendChild(el); }
+  if (t < tIn || t > tOut) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `${title}<small>${subtitle}</small>`;
+  const p = eOut5(prog(t, tIn, tIn + 0.18));
+  el.style.top = y + 'px';
+  el.style.opacity = p;
+  el.style.transform = `translateX(-50%) translateY(${(1 - p) * 16}px) scale(${lerp(0.94, 1, p)})`;
+}
+
+function background(t, colors) {
+  const [a, b] = colors ?? ['#6fd8ff', '#2b7bff'];
+  $('bg').style.background = `radial-gradient(circle at 50% 34%, ${a} 0%, ${b} 46%, #1a2d8f 100%)`;
+  $('rays').style.transform = `rotate(${t * 3}deg)`;
+}
+
+/* ---------------- the film ---------------- */
+let clips = {};
+function setup() {
+  const h = 'hero86';
+  const run = markFrame(h, 'run');
+  clips = {
+    run,
+    x5: zFrame(h, 102, run), // crowd enters the +90 / x5 / -9 row
+    row26: zFrame(h, 26, run),
+    row57: zFrame(h, 57, run),
+    battle: markFrame(h, 'battle'),
+    battleStart: phaseFrame(h, 'battle', markFrame(h, 'battle')),
+    finish: markFrame(h, 'finish'),
+    finishLine: phaseFrame(h, 'finish', markFrame(h, 'finish')),
+    won: phaseFrame(h, 'won', markFrame(h, 'finish')),
+    homeTap: markFrame('home', 'tap-play'),
+    golden: markFrame('meta', 'golden'),
+    open: markFrame('meta', 'open'),
+  };
+  return clips;
+}
+
+const S = {
+  hook: BAR, brand: 2 * BAR, swipe: 3.5 * BAR, dodge: 5.5 * BAR, rivals: 7 * BAR, finish: 8.5 * BAR,
+  worlds: 10 * BAR, meta: 12 * BAR, cta: 14 * BAR, end: DURATION,
+};
+window.SCENES = S;
+
+function renderScene(t) {
+  const C = clips;
+  const h = 'hero86';
+  textUsed = 0;
+  let bgColors = null;
+  full('fullA', null); full('fullB', null);
+  for (let i = 0; i < 3; i++) dev(i, null);
+  $('touch').style.display = 'none';
+  if ($('chip')) $('chip').style.display = 'none';
+  $('icon').style.display = 'none';
+  $('cta').style.display = 'none';
+  $('flash').style.opacity = 0;
+  $('mbx').setAttribute('stdDeviation', '0 0');
+  document.body.style.background = '#121735';
+  $('bg').style.opacity = 1;
+
+  /* 1 · PROBLEM — typographic cold open on deep navy. */
+  if (t < S.hook + 0.4) {
+    bgColors = ['#2a3f9e', '#18225e'];
+    $('rays').style.opacity = 0.5;
+    const z = lerp(1, 1.05, t / S.hook);
+    head(TXT.p1, t, 0.12, S.hook - 0.5, { y: 700, size: 132 });
+    head(TXT.p2, t, 0.12 + 2 * BEAT, S.hook - 0.5, { y: 860, size: 132, color: '#ffc83d' });
+    $('texts').style.transform = `scale(${z})`;
+  } else {
+    $('texts').style.transform = 'none';
+    $('rays').style.opacity = 1;
+  }
+
+  /* 2 · HOOK — the crowd explodes through x5 (real level 86). */
+  if (t >= S.hook - 0.3 && t < S.brand + 0.9) {
+    const local = t - S.hook;
+    // x5 crossing lands one beat into the scene … then stays on the action.
+    const f = C.x5 - Math.round(1.6 * BEAT * 30) + local * 30;
+    const reveal = eInOut5(prog(t, S.hook - 0.3, S.hook + 0.25));
+    const inset = (1 - reveal) * 46;
+    const pulse = Math.exp(-Math.pow((local - 1.6 * BEAT) * 4.5, 2)) * 0.06;
+    if (t < S.brand) {
+      full('fullA', frameOf(h, f), {
+        scale: lerp(1.25, 1.04, reveal) + local * 0.02 + pulse, fy: 1150,
+        clip: reveal < 1 ? `inset(${inset}% ${inset * 0.9}% round ${lerp(80, 0, reveal)}px)` : 'none',
+      });
+      head(TXT.hook, t, S.hook + BEAT, S.brand - 0.1, { y: 200, size: 120 });
+    }
+  }
+
+  /* 3 · DISCOVERY — the screen shrinks into the iPhone; brand + home screen. */
+  if (t >= S.brand && t < S.swipe + 0.6) {
+    const local = t - S.brand;
+    const morph = eInOut5(prog(t, S.brand, S.brand + 0.7));
+    const back = eInOut5(prog(t, S.swipe - 0.42, S.swipe + 0.1)); // zoom back INTO the game
+    const d = morph * (1 - back);
+    const swap = prog(t, S.brand + 0.62, S.brand + 0.82);
+    const fGame = C.x5 - Math.round(1.6 * BEAT * 30) + (local + BAR) * 30;
+    // Real tap on PLAY one second before the zoom: the app's own camera move and level
+    // card play inside the phone, then we fly into the game (same level 86, same frame).
+    const tapT = S.swipe - 1.0;
+    const fHome = C.homeTap + (t - tapT) * 30;
+    const homeSrc = frameOf('home', fHome);
+    const sway = Math.sin(local * 1.2) * 2.5;
+    const fReady = C.run - 15 + Math.max(0, t - (S.swipe - 0.42)) * 30;
+    dev(0, {
+      d, h: 1240, x: W / 2, y: 1210, ry: -12 + sway + local * 2, rx: 6, rz: -1.5,
+      src: back > 0 ? frameOf(h, fReady) : frameOf(h, fGame), src2: homeSrc, mix: back > 0 ? 1 - eOut(prog(t, S.swipe - 0.3, S.swipe - 0.1)) : swap,
+    });
+    // Brand lockup
+    if (t < S.swipe - 0.3) {
+      const pi = eBack(prog(t, S.brand + 0.55, S.brand + 0.95));
+      const ic = $('icon');
+      ic.style.display = 'block';
+      const sz = 170;
+      ic.style.width = ic.style.height = sz + 'px';
+      ic.style.top = '120px';
+      ic.style.transform = `translateX(-50%) scale(${pi}) rotate(${(1 - pi) * -8}deg)`;
+      ic.style.opacity = clamp(pi * 1.4);
+      head('LOO RUSH', t, S.brand + 0.75, S.swipe - 0.42, { y: 320, size: 150 });
+      head(TXT.sub, t, S.brand + 1.05, S.swipe - 0.42, { y: 500, size: 46, sub: true });
+    }
+    // Tap on the real PLAY button (indicator only, the app reacts on its own).
+    if (t > tapT - 0.15 && t < tapT + 0.35 && d > 0.5) {
+      const p = prog(t, tapT - 0.15, tapT + 0.35);
+      const el = $('touch');
+      el.style.display = 'block';
+      el.style.left = W / 2 + 'px';
+      el.style.top = '1580px';
+      el.style.opacity = Math.sin(p * Math.PI);
+      el.style.transform = `scale(${lerp(0.7, 1.25, eOut(p))})`;
+    }
+  }
+
+  /* 4 · CORE LOOP — swipe and pick gates (rows 26 & 57 of level 86), full screen. */
+  if (t >= S.swipe && t < S.dodge + 0.2) {
+    const local = t - S.swipe;
+    // Start from the run start then speed-ramp slightly so both rows fit.
+    const f = C.run + 4 + local * 30 * 1.42;
+    const push = 1.02 + local * 0.012;
+    // Focus punch when a row is crossed.
+    const cross = (fr) => Math.exp(-Math.pow((f - fr) / 9, 2));
+    const pz = (cross(C.row26) + cross(C.row57)) * 0.07;
+    if (t < S.dodge) full('fullA', frameOf(h, f), { scale: push + pz, fy: 1250 });
+    head(TXT.swipe, t, S.swipe + 0.2, S.swipe + BAR - 0.15, { y: 230, size: 104 });
+    head(TXT.gate, t, S.swipe + BAR, S.dodge - 0.1, { y: 230, size: 104 });
+    // Finger indicator mirrors the real steering of the crowd.
+    const st = META[h].states[Math.round(f) - 1];
+    if (st && t < S.dodge - 0.25) {
+      const el = $('touch');
+      el.style.display = 'block';
+      el.style.left = W / 2 + st[2] * 62 + 'px';
+      el.style.top = '1690px';
+      el.style.opacity = 0.9 * prog(t, S.swipe + 0.25, S.swipe + 0.5) * (1 - prog(t, S.dodge - 0.5, S.dodge - 0.25));
+      el.style.transform = 'scale(1)';
+    }
+  }
+
+  /* 5 · OBSTACLES — museum level 45: giant plungers. */
+  if (t >= S.dodge - 0.2 && t < S.rivals + 0.2) {
+    const local = t - S.dodge;
+    const w = whip(t, S.dodge);
+    if (t >= S.dodge - 0.2 && t < S.dodge) full('fullA', frameOf(h, C.run + 4 + (t - S.swipe) * 30 * 1.42), { x: -w.out * W * 0.35, blur: true });
+    if (t >= S.dodge - 0.2) full('fullB', frameOf('obstacles45', 1 + Math.max(0, local + 0.2) * 30), { x: w.inn * W * 0.35, scale: 1.04 + Math.max(0, local) * 0.018, fy: 1200, blur: true });
+    head(TXT.dodge, t, S.dodge + 0.15, S.rivals - 0.1, { y: 230, size: 108 });
+  }
+
+  /* 6 · RIVALS — red queue jumpers vs your crowd (level 86, z = 150). */
+  if (t >= S.rivals - 0.2 && t < S.finish + 0.2) {
+    const local = t - S.rivals;
+    const w = whip(t, S.rivals);
+    const f0 = C.battleStart - Math.round(1.1 * 30);
+    if (t < S.rivals) full('fullA', frameOf('obstacles45', 1 + (t - S.dodge + 0.2) * 30), { x: -w.out * W * 0.35, scale: 1.04 + (t - S.dodge) * 0.018, fy: 1200, blur: true });
+    full('fullB', frameOf(h, f0 + Math.max(0, local + 0.2) * 30), { x: w.inn * W * 0.35, scale: 1.05 + Math.max(0, local) * 0.03, fy: 1000, blur: true });
+    head(TXT.rivals, t, S.rivals + 0.15, S.finish - 0.1, { y: 1560, size: 104 });
+  }
+
+  /* 7 · PAYOFF — finish corridor x1 → x10 and the results. */
+  if (t >= S.finish - 0.2 && t < S.worlds + 0.75) {
+    const local = t - S.finish;
+    const w = whip(t, S.finish);
+    if (t < S.finish) {
+      const f0 = C.battleStart - Math.round(1.1 * 30);
+      full('fullA', frameOf(h, f0 + (t - S.rivals + 0.2) * 30), { x: -w.out * W * 0.35, scale: 1.05 + (t - S.rivals) * 0.03, fy: 1000, blur: true });
+    }
+    // Speed ramp: corridor at 1.9x, then real time on the results.
+    const fl = C.finishLine - 8;
+    const ramp = Math.max(0, local + 0.2);
+    const corridorFrames = C.won + 22 - fl;
+    const tCorr = corridorFrames / (30 * 1.9);
+    const f = ramp < tCorr ? fl + ramp * 30 * 1.9 : C.won + 22 + (ramp - tCorr) * 30;
+    if (t < S.worlds) full('fullB', frameOf(h, f), { x: w.inn * W * 0.35, scale: 1.03 + ramp * 0.012, fy: 1000, blur: true });
+    head(TXT.finish, t, S.finish + 0.15, S.finish + tCorr - 0.05, { y: 210, size: 108 });
+  }
+
+  /* 8 · WORLDS — the iPhone returns; one world per beat. */
+  if (t >= S.worlds && t < S.meta + 0.6) {
+    const local = t - S.worlds;
+    const morph = eInOut5(prog(t, S.worlds, S.worlds + 0.6));
+    const k = clamp(Math.floor((local - 0.3) / BEAT), 0, 7);
+    const wk = ['w5', 'w15', 'w25', 'w35', 'w45', 'w55', 'w65', 'w75'][k];
+    const within = local - 0.3 - k * BEAT;
+    bgColors = WORLDS[k] ? WORLDS[k].ui : null;
+    // Before the first world, the screen still shows the results (seamless shrink).
+    const ramp = t - S.finish + 0.2;
+    const fl = C.finishLine - 8, corridorFrames = C.won + 22 - fl, tCorr = corridorFrames / (30 * 1.9);
+    const fRes = C.won + 22 + (ramp - tCorr) * 30;
+    const src = local < 0.3 ? frameOf(h, fRes) : frameOf(wk, 1 + Math.max(0, within) * 30);
+    const exit = eInOut5(prog(t, S.meta - 0.1, S.meta + 0.5));
+    dev(0, { d: morph, h: 1330, x: lerp(W / 2, -W * 0.2, exit), y: 1180, ry: lerp(-10, 10, local / (2 * BAR)), rx: 5, rz: lerp(-2, 2, local / (2 * BAR)), src, opacity: 1 - exit * 0.2 });
+    if (local > 0.3 && t < S.meta - 0.1 && WORLDS[k]) chip(WORLDS[k].name, `${WORLDS[k].index}`, t, S.worlds + 0.3 + k * BEAT, S.worlds + 0.3 + (k + 1) * BEAT - 0.02, 1700);
+    head(TXT.worlds1, t, S.worlds + 0.35, S.meta - 0.15, { y: 150, size: 112 });
+    head(TXT.worlds2, t, S.worlds + 0.35 + 4 * BEAT, S.meta - 0.15, { y: 290, size: 84, color: '#ffc83d' });
+  }
+
+  /* 9 · META — skins (live 3D preview) then the epic chest. */
+  if (t >= S.meta - 0.1 && t < S.cta + 0.6) {
+    const local = t - S.meta;
+    const inA = eOut5(prog(t, S.meta - 0.1, S.meta + 0.55));
+    const inB = eOut5(prog(t, S.meta + 4 * BEAT - 0.25, S.meta + 4 * BEAT + 0.4));
+    const exit = eInOut5(prog(t, S.cta - 0.15, S.cta + 0.5));
+    const fA = C.golden - 4 + Math.max(0, local) * 30;
+    const fB = C.open - 2 + Math.max(0, local - 4 * BEAT + 0.25) * 30;
+    dev(1, {
+      d: 1, h: lerp(1330, 1150, inB), x: lerp(W * 1.3, lerp(W / 2, W * 0.3, inB), inA), y: lerp(1180, 1150, inB) + exit * 1100,
+      ry: lerp(-14, 10, inB), rx: 4, rz: lerp(3, -2, inB), src: frameOf('meta', fA), z: 1, opacity: 1 - inB * 0.15,
+    });
+    if (inB > 0) dev(2, {
+      d: 1, h: 1180, x: lerp(W * 1.35, W * 0.7, inB), y: 1230 + exit * 1100, ry: -10, rx: 4, rz: 2, src: frameOf('meta', fB), z: 2,
+    });
+    head(TXT.skins, t, S.meta + 0.2, S.meta + 4 * BEAT - 0.25, { y: 170, size: 104 });
+    head(TXT.chests, t, S.meta + 4 * BEAT, S.cta - 0.2, { y: 190, size: 104 });
+  }
+
+  /* 10 · CALL TO ACTION. */
+  if (t >= S.cta) {
+    const local = t - S.cta;
+    const pi = eBack(prog(t, S.cta + 0.02, S.cta + 0.5));
+    const ic = $('icon');
+    ic.style.display = 'block';
+    const sz = 300;
+    ic.style.width = ic.style.height = sz + 'px';
+    ic.style.top = '360px';
+    ic.style.transform = `translateX(-50%) scale(${pi * (1 + local * 0.01)})`;
+    ic.style.opacity = clamp(pi * 1.4);
+    head('LOO RUSH', t, S.cta + 0.25, 99, { y: 720, size: 170 });
+    head(TXT.tag, t, S.cta + 0.5, 99, { y: 925, size: 50, sub: true });
+    const pc = eBack(prog(t, S.cta + 0.8, S.cta + 1.2));
+    const cta = $('cta');
+    cta.style.display = 'block';
+    cta.textContent = TXT.cta;
+    cta.style.top = '1110px';
+    cta.style.opacity = clamp(pc * 1.5);
+    cta.style.transform = `translateX(-50%) scale(${lerp(0.6, 1, pc) * (1 + 0.025 * Math.sin(Math.max(0, local - 1.2) * 5))})`;
+    // The real home screen rises from the bottom, gently.
+    const up = eOut5(prog(t, S.cta - 0.05, S.cta + 1.0));
+    // Home screen before the PLAY tap only (frames 1 … tap), slightly slowed.
+    dev(0, { d: 1, h: 1300, x: W / 2, y: lerp(2700, 2080, up), ry: 0, rx: 14, src: frameOf('home', Math.min(C.homeTap - 1, 1 + local * 30 * 0.8)) });
+    // Fade to the brand color at the very end.
+    $('flash').style.background = '#1a2d8f';
+    $('flash').style.opacity = eIn(prog(t, DURATION - 0.35, DURATION));
+  }
+
+  background(t, bgColors);
+  for (let i = textUsed; i < textPool.length; i++) textPool[i].style.display = 'none';
+}
+
+/* Directional whip between two full-screen shots, centered on a cut at tc. */
+function whip(t, tc) {
+  const outP = t < tc ? eIn(prog(t, tc - 0.2, tc)) : 0;
+  const inP = 1 - eOut(prog(t, tc, tc + 0.22));
+  const blur = Math.max(outP, inP) * 34;
+  $('mbx').setAttribute('stdDeviation', `${blur.toFixed(1)} 0`);
+  return { out: outP, inn: inP };
+}
+
+window.init = async (meta, worlds) => {
+  META = meta;
+  WORLDS = worlds;
+  setup();
+  await document.fonts.load('100px Lilita');
+  await document.fonts.load('900 40px Nunito');
+  await document.fonts.load('800 40px Nunito');
+  await $('icon').querySelector('img').decode().catch(() => {});
+  return clips;
+};
+window.renderAt = async (t) => {
+  pending.length = 0;
+  VIS = [];
+  renderScene(t);
+  await Promise.all(pending);
+  return VIS;
+};
+</script>
+</body></html>
