@@ -1,6 +1,6 @@
 # QA, audit & known limitations
 
-## Automated tests (`npm test`, 1,417 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
+## Automated tests (`npm test`, 1,422 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
 * **Gates**: every operation, clamping at 9,999,999, timed gates, labels.
 * **Level generation**: deterministic per seed; not a modulo loop (levels n and n+10/20/40/80/800 differ);
   levels 1–3000 + 10 000, 123 456, 9 999 999 are all valid (finite numbers, bounds, rivals > 0, finish corridor
@@ -33,6 +33,15 @@ Balancing: `npm run balance` (planner win rates: 100% levels 2–80, ~95% 100–
   Only finding: expo-audio's *web* player calls `HTMLMediaElement.play()` without handling its rejection
   (autoplay policy / play-pause race) → harmless unhandled rejections on web only (not on iOS).
 * iOS production bundle inspected: no `three.cjs`, no Node-only API, no debug hooks.
+
+## Final pre-release pass (soundtrack build)
+* Jest **1,422 / 1,422**, lint + typecheck clean, `expo-doctor` 21/21, iOS export + prebuild verified (6 AAC loops +
+  17 SFX bundled, privacy manifest, en/fr strings, no microphone key, no debug code).
+* UI monkey: 1,800 random actions on the final web build → 0 problems; real playback check: menu theme on home,
+  crossfade to the world's track (e.g. Surf in Splash Park) on PLAY, no media errors; chest stress → exact counts.
+* Fixed: the soundtrack generator was not deterministic (random noise unseeded) → seeded, bit-identical renders.
+* Fixed: AAC music could not play in browsers without AAC (open-source Chromium) → web builds use MP3 copies
+  (`musicSources.web.ts`); iOS keeps the gapless AAC loops.
 
 ## Pre-release audit (October 2026)
 * Jest **1,417 / 1,417**, lint + typecheck clean, `expo-doctor` 21/21, iOS export + `expo prebuild` verified

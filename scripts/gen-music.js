@@ -838,15 +838,20 @@ function writeWav(file, L, R) {
 
 if (require.main === module) {
   fs.mkdirSync(WORK, { recursive: true });
+  fs.mkdirSync(path.join(OUT, 'web'), { recursive: true });
   const only = process.argv[2];
   for (const spec of SONGS) {
     if (only && spec.id !== only) continue;
+    // Deterministic noise/phases: the same script always renders the same files.
+    Math.random = rng(0x5eed0000 + (spec.seed ?? 0));
     const t0 = Date.now();
     const { L, R, seconds, peak } = renderSong(spec);
     const wav = path.join(WORK, `music_${spec.id}.wav`);
     writeWav(wav, L, R);
     // AAC in MP4 (gapless edit list), 160 kb/s stereo.
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', wav, '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', path.join(OUT, `music_${spec.id}.m4a`)]);
+    // Web builds: MP3 (AAC is missing from some open-source browsers). iOS keeps the AAC file.
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', wav, '-c:a', 'libmp3lame', '-b:a', '112k', path.join(OUT, 'web', `music_${spec.id}.mp3`)]);
     const kb = (fs.statSync(path.join(OUT, `music_${spec.id}.m4a`)).size / 1024).toFixed(0);
     console.log(`music_${spec.id}: ${seconds.toFixed(1)} s, ${spec.bars} bars @ ${spec.bpm} BPM, peak ${peak.toFixed(2)}, ${kb} KB, ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }

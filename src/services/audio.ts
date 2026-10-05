@@ -1,5 +1,6 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { log } from './log';
+import { MUSIC_SOURCES } from './musicSources';
 
 /**
  * Audio manager: small pools per SFX (overlapping plays), throttling for
@@ -27,15 +28,8 @@ const SFX = {
   stall: require('../../assets/audio/stall.wav'),
 } as const;
 
-/** Soundtrack (scripts/gen-music.js): seamless AAC loops, one mood per world family. */
-const MUSIC = {
-  menu: require('../../assets/audio/music_menu.m4a'),
-  groove: require('../../assets/audio/music_groove.m4a'),
-  march: require('../../assets/audio/music_march.m4a'),
-  jazz: require('../../assets/audio/music_jazz.m4a'),
-  surf: require('../../assets/audio/music_surf.m4a'),
-  spooky: require('../../assets/audio/music_spooky.m4a'),
-} as const;
+/** Soundtrack (scripts/gen-music.js): AAC loops on iOS, MP3 on web (see musicSources.web.ts). */
+const MUSIC = MUSIC_SOURCES;
 
 export type SfxId = keyof typeof SFX;
 export type MusicId = keyof typeof MUSIC | 'none';
