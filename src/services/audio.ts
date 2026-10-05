@@ -27,9 +27,14 @@ const SFX = {
   stall: require('../../assets/audio/stall.wav'),
 } as const;
 
+/** Soundtrack (scripts/gen-music.js): seamless AAC loops, one mood per world family. */
 const MUSIC = {
-  menu: require('../../assets/audio/music_menu.wav'),
-  game: require('../../assets/audio/music_game.wav'),
+  menu: require('../../assets/audio/music_menu.m4a'),
+  groove: require('../../assets/audio/music_groove.m4a'),
+  march: require('../../assets/audio/music_march.m4a'),
+  jazz: require('../../assets/audio/music_jazz.m4a'),
+  surf: require('../../assets/audio/music_surf.m4a'),
+  spooky: require('../../assets/audio/music_spooky.m4a'),
 } as const;
 
 export type SfxId = keyof typeof SFX;
@@ -38,12 +43,21 @@ export type MusicId = keyof typeof MUSIC | 'none';
 const POOL: Partial<Record<SfxId, number>> = { pop: 4, coin: 3, splat: 3, tap: 2, stall: 2, gate_good: 2 };
 const MIN_GAP: Partial<Record<SfxId, number>> = { pop: 45, splat: 70, coin: 40, battle: 220, tap: 30 };
 const VOLUME: Partial<Record<SfxId, number>> = { pop: 0.5, splat: 0.6, coin: 0.55, whoosh: 0.5, tap: 0.6, battle: 0.7 };
-const MUSIC_VOLUME = 0.38;
+const MUSIC_VOLUME = 0.4;
+const FADE_OUT_S = 0.45;
+const FADE_IN_S = 0.7;
+const FADE_TICK_MS = 40;
 
 class AudioManager {
   private pools = new Map<SfxId, { players: AudioPlayer[]; next: number; last: number }>();
   private music: AudioPlayer | null = null;
   private musicId: MusicId = 'none';
+  /** Current level of `music` and the level it fades towards (ducking). */
+  private musicLevel = 0;
+  private musicTarget = MUSIC_VOLUME;
+  /** Previous tracks fading out (crossfade). */
+  private fading: { p: AudioPlayer; v: number }[] = [];
+  private fadeTimer: ReturnType<typeof setInterval> | null = null;
   private sfxOn = true;
   private musicOn = true;
   private ready = false;
@@ -79,15 +93,19 @@ class AudioManager {
 
   setMusic(on: boolean) {
     this.musicOn = on;
-    if (!on) this.music?.pause();
-    else if (!this.suspended) this.music?.play();
+    if (!on) {
+      this.music?.pause();
+      this.dropFading();
+    } else if (!this.suspended) this.resumeMusic();
   }
 
   /** Called when the app goes to background / returns. */
   setSuspended(s: boolean) {
     this.suspended = s;
-    if (s) this.music?.pause();
-    else if (this.musicOn) this.music?.play();
+    if (s) {
+      this.music?.pause();
+      this.dropFading();
+    } else if (this.musicOn) this.resumeMusic();
   }
 
   play(id: SfxId, rate = 1) {
@@ -109,33 +127,89 @@ class AudioManager {
     }
   }
 
+  /** Switches track with a short crossfade (same track: only the rate changes). */
   playMusic(id: MusicId, rate = 1) {
     if (id === this.musicId) {
       if (this.music && this.music.playbackRate !== rate) this.music.setPlaybackRate(rate, 'low');
       return;
     }
     this.musicId = id;
-    try {
-      this.music?.pause();
-      this.music?.remove();
-    } catch {}
-    this.music = null;
-    if (id === 'none') return;
-    try {
-      const p = createAudioPlayer(MUSIC[id]);
-      p.loop = true;
-      p.volume = MUSIC_VOLUME;
-      if (rate !== 1) p.setPlaybackRate(rate, 'low');
-      this.music = p;
-      if (this.musicOn && !this.suspended) p.play();
-    } catch (e) {
-      log.warn('music', e);
+    if (this.music) {
+      if (this.musicOn && !this.suspended) this.fading.push({ p: this.music, v: this.musicLevel });
+      else this.release(this.music);
     }
+    this.music = null;
+    this.musicLevel = 0;
+    if (id !== 'none') {
+      try {
+        const p = createAudioPlayer(MUSIC[id]);
+        p.loop = true;
+        p.volume = 0;
+        if (rate !== 1) p.setPlaybackRate(rate, 'low');
+        this.music = p;
+        if (this.musicOn && !this.suspended) p.play();
+      } catch (e) {
+        log.warn('music', e);
+      }
+    }
+    this.startFade();
   }
 
   /** Temporarily lowers music (results/fanfare). */
   duck(v: boolean) {
-    if (this.music) this.music.volume = v ? MUSIC_VOLUME * 0.35 : MUSIC_VOLUME;
+    this.musicTarget = v ? MUSIC_VOLUME * 0.35 : MUSIC_VOLUME;
+    this.startFade();
+  }
+
+  private resumeMusic() {
+    if (!this.music) return;
+    this.music.play();
+    this.startFade();
+  }
+
+  private startFade() {
+    if (this.fadeTimer) return;
+    this.fadeTimer = setInterval(() => this.tickFade(), FADE_TICK_MS);
+  }
+
+  private tickFade() {
+    const dt = FADE_TICK_MS / 1000;
+    for (const f of this.fading) {
+      f.v -= (MUSIC_VOLUME / FADE_OUT_S) * dt;
+      try {
+        if (f.v <= 0) this.release(f.p);
+        else f.p.volume = f.v;
+      } catch {}
+    }
+    this.fading = this.fading.filter((f) => f.v > 0);
+    let settled = true;
+    if (this.music) {
+      const step = (MUSIC_VOLUME / FADE_IN_S) * dt;
+      const d = this.musicTarget - this.musicLevel;
+      if (Math.abs(d) > 1e-3) {
+        this.musicLevel += Math.sign(d) * Math.min(Math.abs(d), step);
+        settled = false;
+      }
+      try {
+        this.music.volume = this.musicLevel;
+      } catch {}
+    }
+    if (settled && this.fading.length === 0 && this.fadeTimer) {
+      clearInterval(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+  }
+
+  private dropFading() {
+    for (const f of this.fading) this.release(f.p);
+    this.fading = [];
+  }
+
+  private release(p: AudioPlayer) {
+    try {
+      p.pause();
+      p.remove();
+    } catch {}
   }
 }
 

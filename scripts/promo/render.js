@@ -58,7 +58,8 @@ function readWav(file) {
   return { rate, s: out };
 }
 const wavCache = {};
-const wav = (id) => (wavCache[id] ??= readWav(path.join(ROOT, 'assets/audio', id + '.wav')));
+// The promo is cut on the original 128 BPM loop kept in scripts/promo/audio; SFX come from the game.
+const wav = (id) => (wavCache[id] ??= readWav(fs.existsSync(path.join(__dirname, 'audio', id + '.wav')) ? path.join(__dirname, 'audio', id + '.wav') : path.join(ROOT, 'assets/audio', id + '.wav')));
 
 function writeWav(file, L, R) {
   const n = L.length;

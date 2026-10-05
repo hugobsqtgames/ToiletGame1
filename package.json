@@ -52,7 +52,8 @@
     "typecheck": "tsc --noEmit",
     "balance": "tsx scripts/balance.ts",
     "lint": "expo lint",
-    "release-check": "node scripts/release-check.js"
+    "release-check": "node scripts/release-check.js",
+    "music": "node scripts/gen-music.js"
   },
   "private": true,
   "jest": {

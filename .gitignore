@@ -45,3 +45,6 @@ yarn-error.*
 
 # promo video work dir
 .promo/
+
+# soundtrack render work dir
+.music-work/

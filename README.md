@@ -8,7 +8,7 @@ Swipe left and right to steer a goofy crowd toward the restroom. Pick the right 
 |---|---|
 | Engine | Expo (managed / CNG), TypeScript strict, react-three-fiber + three r186 |
 | Platforms | iOS (primary). Web build is used for previews, QA and screenshots. |
-| Tests | 1,417 Jest tests: unit + stress/fuzz/monkey battery (see [docs/TESTING.md](docs/TESTING.md)), plus a Playwright UI monkey |
+| Tests | 1,422 Jest tests: unit + stress/fuzz/monkey battery (see [docs/TESTING.md](docs/TESTING.md)), plus a Playwright UI monkey |
 | Lint / types | `npm run lint` and `npm run typecheck` are clean |
 
 ## Quick start
@@ -16,7 +16,7 @@ Swipe left and right to steer a goofy crowd toward the restroom. Pick the right 
 ```bash
 npm install
 npx expo start            # scan the QR code with Expo Go (iOS) — gameplay, UI, saves, audio all work
-npm test                  # 1,417 tests incl. stress/fuzz/monkey suites (~7 min)
+npm test                  # 1,422 tests incl. stress/fuzz/monkey suites (~7 min)
 npm run typecheck && npm run lint
 npm run balance -- 1,10,50,200,1000 5   # balancing report (planner bot vs random bot)
 ```

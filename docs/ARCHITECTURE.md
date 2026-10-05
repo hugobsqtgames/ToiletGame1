@@ -46,7 +46,7 @@ src/
     time.ts           local day/week keys
   services/    Side effects behind small facades
     storage.ts        persistence (coalesced writes, backup, recovery)
-    audio.ts          SFX pools + music
+    audio.ts          SFX pools + music channel (crossfades, ducking, one track per world mood)
     haptics.ts        throttled haptics
     analytics.ts      privacy-first event queue with pluggable sinks
     ads/              AdService facade, AdMob provider, dev simulator, frequency policy
@@ -67,7 +67,7 @@ src/
     geo.ts            geometry merging, pill badges, sky dome
   state/       store.ts (tiny external store), app.ts (UI state), hud.ts (high-freq HUD), actions.ts
   ui/          theme, i18n (en/fr), components/kit, screens/*
-scripts/       gen-audio.js (procedural audio), balance.ts, make-save.ts (QA)
+scripts/       gen-audio.js (SFX), gen-music.js (soundtrack), balance.ts, make-save.ts, release-check.js, promo/
 __tests__/     Jest suites
 assets/        icon, splash, generated audio
 ```

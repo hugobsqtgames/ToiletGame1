@@ -1,7 +1,8 @@
 import { AppState as RNAppState, BackHandler, PixelRatio, Platform } from 'react-native';
 import { generateLevel } from '../core/levelGen';
 import type { Simulation } from '../core/simulation';
-import { worldOfLevel } from '../core/worlds';
+import { getWorld, worldOfLevel } from '../core/worlds';
+import type { LevelDef } from '../core/types';
 import { claimDaily as claimDailyPure } from '../meta/daily';
 import { FREE_COINS_PER_DAY, GEM_COIN_PACKS, REVIVE_GEMS, freeCoinsAmount, gemPackCoins, reviveCount, startBonus, type UpgradeId } from '../meta/economy';
 import { refreshMissions } from '../meta/missions';
@@ -16,7 +17,7 @@ import { dayKey } from '../meta/time';
 import { ads } from '../services/ads/AdService';
 import { recordInterstitialShown, recordRewardedShown, recordRunForAds, shouldShowInterstitial } from '../services/ads/policy';
 import { analytics } from '../services/analytics';
-import { audio } from '../services/audio';
+import { audio, type MusicId } from '../services/audio';
 import { haptics } from '../services/haptics';
 import { iap } from '../services/iap/IapService';
 import { grantPurchase, restoreEntitlements, type ProductKey } from '../services/iap/catalog';
@@ -201,6 +202,10 @@ function showReward(title: string, reward: Reward) {
 
 /* ---------------- runs ---------------- */
 
+function musicFor(def: LevelDef | undefined): MusicId {
+  return def ? getWorld(def.world).theme.music : 'groove';
+}
+
 function loadMenuLevel() {
   const s = app.get().save;
   const def = generateLevel(s.level);
@@ -219,7 +224,8 @@ function enterPlay() {
   const st = app.get();
   game.setCameraMode('play');
   audio.play('tap');
-  audio.playMusic('game', st.run?.def.isBoss ? 1.06 : 1);
+  // Each world family has its own track (theme.music); boss levels play it a touch faster.
+  audio.playMusic(musicFor(st.run?.def), st.run?.def.isBoss ? 1.06 : 1);
   app.set({ screen: 'play', modal: null, results: null });
   const def = app.get().run!.def;
   analytics.track({ name: 'level_start', params: { level: def.level, world: def.world, mode: app.get().run!.mode } });

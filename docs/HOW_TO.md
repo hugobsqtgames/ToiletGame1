@@ -61,6 +61,13 @@ Rewards are the `Reward` type (`coins`, `gems`, `keys`, `chest`, `skin`) granted
 Add it to `PRODUCTS` (`src/services/iap/catalog.ts`), create the same ID in App Store Connect, and add a tile in
 `ShopModal`. Granting/restoring is generic.
 
+## Change or add music
+The soundtrack is synthesized by `scripts/gen-music.js` (no samples, no licences): six seamless loops
+(`menu`, `groove`, `march`, `jazz`, `surf`, `spooky`) rendered to `assets/audio/music_<id>.m4a` with `npm run music`.
+Each base world picks its track with `music` in `BASE_THEMES` (remix worlds inherit it); boss levels play it 6% faster.
+To add a mood: add a song spec to `SONGS` (tempo, chords per bar, `parts()` scheduling instruments), add the id to
+`MUSIC` in `src/services/audio.ts` and to the `music` union in `src/core/worlds.ts`. Tracks crossfade automatically.
+
 ## Add a sound
 Add a synth recipe in `scripts/gen-audio.js`, run `node scripts/gen-audio.js`, register it in `SFX`
 (`src/services/audio.ts`), then `audio.play('id')`.
