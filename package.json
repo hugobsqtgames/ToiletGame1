@@ -51,7 +51,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "balance": "tsx scripts/balance.ts",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "release-check": "node scripts/release-check.js"
   },
   "private": true,
   "jest": {

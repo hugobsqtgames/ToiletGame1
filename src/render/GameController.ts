@@ -236,7 +236,7 @@ export class GameController {
     this.sim.revive(count);
     this.endTimer = -1;
     this.endInfo = null;
-    this.crowd!.mode = 'run';
+    if (this.crowd) this.crowd.mode = 'run';
     this.setCameraMode(this.sim.s.phase === 'finish' ? 'finish' : 'play');
     this.fx.burst(this.sim.s.x, 0.5, -this.sim.s.z, 40, ['#FFFFFF', '#FFE14D', '#7FD3FF'], { speed: 6, up: 7 });
     audio.play('unlock');

@@ -45,11 +45,17 @@ function createStoreKitProvider(): Provider {
   const iap = require('expo-iap') as typeof import('expo-iap');
   let list: StoreProduct[] = fallbackProducts();
   const waiters = new Map<string, (s: PurchaseStatus) => void>();
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const subs: { remove: () => void }[] = [];
 
   const settle = (sku: string | null | undefined, s: PurchaseStatus) => {
     if (!sku) return;
     const w = waiters.get(sku);
+    const tm = timers.get(sku);
+    if (tm) {
+      clearTimeout(tm);
+      timers.delete(sku);
+    }
     if (w) {
       waiters.delete(sku);
       w(s);
@@ -106,8 +112,11 @@ function createStoreKitProvider(): Provider {
           log.warn('requestPurchase', e);
           settle(id, String((e as { code?: string })?.code) === 'user-cancelled' ? 'cancelled' : 'error');
         });
-        // Safety: never leave the UI spinning forever.
-        setTimeout(() => settle(id, 'error'), 120_000);
+        // Safety: never leave the UI spinning forever (cleared when this purchase settles,
+        // so it can never fail a later purchase of the same product).
+        const old = timers.get(id);
+        if (old) clearTimeout(old);
+        timers.set(id, setTimeout(() => settle(id, 'error'), 120_000));
       });
     },
     async restore() {

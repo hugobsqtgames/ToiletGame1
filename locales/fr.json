@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Loo Rush",
+    "NSUserTrackingUsageDescription": "Tes données servent à t'afficher des publicités plus pertinentes. Tu peux continuer à jouer gratuitement si tu refuses."
+  }
+}

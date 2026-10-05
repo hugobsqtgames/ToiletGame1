@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCount } from '../../core/format';
@@ -246,7 +246,12 @@ export function ChestModal() {
   // Never leave the menu hidden if the modal is closed mid-reveal (e.g. Android back).
   useEffect(() => () => app.set({ cinematic: false }), []);
 
+  const starting = useRef(false);
   const start = (tier: ChestTier) => {
+    // A double tap on OPEN must not open (and skip the reveal of) two chests.
+    if (starting.current) return;
+    starting.current = true;
+    setTimeout(() => (starting.current = false), 400);
     // The reward is rolled and saved BEFORE the animation: quitting mid-reveal can't reroll it.
     const r = openChest(tier);
     if (!r) return;

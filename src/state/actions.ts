@@ -35,6 +35,10 @@ import { hud } from './hud';
 const now = () => Date.now();
 let toastId = 0;
 let lastPurchaseOrRewardAt = 0;
+/** The run whose result was already applied (double taps must never count a run twice). */
+let finalizedRun: object | null = null;
+/** True while results → next run is in progress (an interstitial may be showing). */
+let leavingResults = false;
 
 /* ---------------- save helpers ---------------- */
 
@@ -276,15 +280,20 @@ function onRunEnd(kind: 'won' | 'lost', sim: Simulation, info: { multiplier: num
   finalizeRun(kind === 'won', sim, info);
 }
 
+const canReviveNow = () => app.get().modal === 'revive' && !!game.sim?.canRevive();
+
 export async function reviveWithAd() {
+  if (!canReviveNow() || ads.isShowing) return;
   const ok = await ads.showRewarded('revive');
   if (!ok) return toast(t('adUnavailable'), 'bad');
   lastPurchaseOrRewardAt = now();
   commit(recordRewardedShown(app.get().save, now()));
-  doRevive();
+  if (canReviveNow()) doRevive();
 }
 
 export function reviveWithGems() {
+  // Guard first: a double tap must never spend the gems twice.
+  if (!canReviveNow()) return;
   if (!mutate((s) => spendGems(s, REVIVE_GEMS))) return toast(t('notEnough', { c: '💎' }), 'bad');
   doRevive();
 }
@@ -297,7 +306,7 @@ function doRevive() {
 
 export function declineRevive() {
   const sim = game.sim;
-  if (!sim) return;
+  if (!sim || app.get().modal !== 'revive') return;
   app.set({ modal: null });
   finalizeRun(false, sim, { multiplier: 1, stallIndex: -1, finishCount: 0, perfect: false });
 }
@@ -305,7 +314,8 @@ export function declineRevive() {
 function finalizeRun(won: boolean, sim: Simulation, info: { multiplier: number; stallIndex: number; finishCount: number; perfect: boolean }) {
   const st = app.get();
   const run = st.run;
-  if (!run) return;
+  if (!run || finalizedRun === run) return;
+  finalizedRun = run;
   const result: RunResult = {
     mode: run.mode,
     level: run.def.level,
@@ -346,6 +356,17 @@ export async function tripleCoins() {
 
 /** Results → next run (campaign) — the only place interstitials may appear. */
 export async function continueAfterResults(kind: 'next' | 'retry' | 'home') {
+  // Double taps / taps during the interstitial must not start the next run twice.
+  if (leavingResults || app.get().modal !== 'results') return;
+  leavingResults = true;
+  try {
+    await leaveResults(kind);
+  } finally {
+    leavingResults = false;
+  }
+}
+
+async function leaveResults(kind: 'next' | 'retry' | 'home') {
   audio.duck(false);
   const st = app.get();
   const queued = st.queue;
@@ -461,9 +482,14 @@ export async function buyProduct(key: ProductKey) {
 
 export async function restorePurchases() {
   if (!iap.available) return toast(t('storeUnavailable'), 'bad');
+  if (app.get().busy) return;
   app.set({ busy: true });
-  const ids = await iap.restore();
-  app.set({ busy: false });
+  let ids: string[] | null = null;
+  try {
+    ids = await iap.restore();
+  } finally {
+    app.set({ busy: false });
+  }
   if (ids === null) return toast(t('purchaseFailed'), 'bad');
   const before = app.get().save;
   const next = restoreEntitlements(before, ids);
@@ -499,7 +525,16 @@ export function buyCoinsWithGems(packId: string) {
 
 export async function resetProgress() {
   await wipeSave();
-  const fresh = { ...defaultSave(now()), settings: app.get().save.settings };
+  // Progress is wiped, but never what the player paid for (Remove Ads, Starter pack + its skin).
+  const old = app.get().save;
+  const base = defaultSave(now());
+  const paid = old.purchases.starter ? old.skins.owned.filter((id) => id === 'golden') : [];
+  const fresh: SaveData = {
+    ...base,
+    settings: old.settings,
+    purchases: { ...old.purchases },
+    skins: { ...base.skins, owned: [...base.skins.owned, ...paid] },
+  };
   commit(fresh);
   game.setSkin(skinById(fresh.skins.selected));
   goHome();

@@ -22,7 +22,8 @@ npx eas-cli@latest login
 npx eas-cli@latest init                      # writes extra.eas.projectId in app.json
 npx eas-cli@latest build --profile development --platform ios
 npx eas-cli@latest build --profile production --platform ios
-npx eas-cli@latest submit --profile production --platform ios   # fill appleId / ascAppId / appleTeamId in eas.json
+npx eas-cli@latest submit --profile production --platform ios   # asks for the Apple account / app the first time
+npm run release-check                         # must pass before the production build
 ```
 
 ## Privacy / GDPR
@@ -31,12 +32,17 @@ npx eas-cli@latest submit --profile production --platform ios   # fill appleId /
   Settings ("Share anonymous gameplay stats"). Production ships with **no** analytics sink until you add one.
 * Ads: Google UMP consent form (EEA/UK/US states) before any ad request; ATT prompt on iOS after consent;
   "Ad privacy choices" in Settings when required.
-* Host a privacy policy and set the URL in `src/ui/screens/MetaModals.tsx` (`PRIVACY_POLICY_URL`).
+* Host a privacy policy (ready-to-host EN/FR draft: `docs/PRIVACY_POLICY.md`) and set the URL in
+  `src/ui/screens/MetaModals.tsx` (`PRIVACY_POLICY_URL`).
+* iOS privacy manifest (`ios.privacyManifests` in app.json): required-reason APIs used by React Native/Expo
+  (UserDefaults CA92.1, file timestamps C617.1, system boot time 35F9.1, disk space E174.1). Expo and Google
+  SDKs ship their own manifests.
 * App Store privacy "nutrition label": declare data collected by the Google Mobile Ads SDK (Identifiers,
   Usage Data, Diagnostics — linked for tracking if the user allows ATT). Declare nothing for the game itself
   unless you plug an analytics backend.
 
 ## Publication checklist
+- [ ] `npm run release-check` passes (it lists exactly what is still missing)
 - [ ] Apple Developer account, Paid Apps agreement, tax & banking
 - [ ] App Store Connect app record with bundle id `com.loorush.game`
 - [ ] 5 IAP products created with the exact IDs (docs/MONETIZATION.md), screenshots for review

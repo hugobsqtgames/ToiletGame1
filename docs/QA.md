@@ -1,6 +1,6 @@
 # QA, audit & known limitations
 
-## Automated tests (`npm test`, 1,403 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
+## Automated tests (`npm test`, 1,417 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
 * **Gates**: every operation, clamping at 9,999,999, timed gates, labels.
 * **Level generation**: deterministic per seed; not a modulo loop (levels n and n+10/20/40/80/800 differ);
   levels 1–3000 + 10 000, 123 456, 9 999 999 are all valid (finite numbers, bounds, rivals > 0, finish corridor
@@ -33,6 +33,25 @@ Balancing: `npm run balance` (planner win rates: 100% levels 2–80, ~95% 100–
   Only finding: expo-audio's *web* player calls `HTMLMediaElement.play()` without handling its rejection
   (autoplay policy / play-pause race) → harmless unhandled rejections on web only (not on iOS).
 * iOS production bundle inspected: no `three.cjs`, no Node-only API, no debug hooks.
+
+## Pre-release audit (October 2026)
+* Jest **1,417 / 1,417**, lint + typecheck clean, `expo-doctor` 21/21, iOS export + `expo prebuild` verified
+  (privacy manifest, localized ATT prompt, no debug hooks / Node APIs in the bundle).
+* UI monkey on the final build: 1,800 random actions (fresh, advanced and daily-reward saves) → 0 problems;
+  deterministic chest stress (triple tap on OPEN, tap spam during the animation, OPEN NEXT spam) → exact counts.
+* `npm run release-check` lists what only the publisher can provide (AdMob IDs, privacy policy URL, `eas init`).
+
+| Finding | Fix |
+|---|---|
+| Double tap on "No thanks" (revive) counted the run twice (coins, stats, missions) | Run results applied once per run |
+| Double tap on "Revive (gems)" spent the gems twice | Guard before spending |
+| NEXT tapped twice / during the interstitial restarted the next level | Single transition guard |
+| Reset progress also wiped Remove Ads / Starter pack | Purchases and paid skin kept |
+| Restore purchases could leave the UI busy forever on an error | `try/finally` |
+| The 120 s purchase timeout was never cleared and could fail a later purchase | Timer per purchase, cleared on settle |
+| Double tap on a chest's OPEN opened two chests (one reveal skipped) | Debounced |
+| ATT prompt in English only | Localized (en/fr) via `locales` |
+| No iOS privacy manifest; EAS placeholders that would break `eas build` | `ios.privacyManifests`, placeholders removed |
 
 ## Audit findings fixed (stress battery)
 | Finding | Fix |
