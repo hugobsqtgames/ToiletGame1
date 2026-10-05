@@ -6,10 +6,11 @@ import { damp } from '../core/math';
  *  - menu: in front of the crowd, looking back at them (they face the player),
  *  - play: behind and above, distance grows with crowd radius & speed,
  *  - finish: lower, cinematic, slowly orbiting during the celebration,
- *  - showcase: close-up for the skins screen.
+ *  - showcase: close-up for the skins screen,
+ *  - chest: fixed framing of the chest-opening stage (set with setFixedPose).
  * Effects: trauma-based shake and FOV punch, both decaying.
  */
-export type CamMode = 'menu' | 'play' | 'finish' | 'showcase';
+export type CamMode = 'menu' | 'play' | 'finish' | 'showcase' | 'chest';
 
 const _target = new THREE.Vector3();
 const _look = new THREE.Vector3();
@@ -23,12 +24,33 @@ export class CameraRig {
   private orbit = 0;
   private radius = 1;
   private baseFov = 55;
+  private aspect = 0.46;
+  private fixedPos = new THREE.Vector3();
+  private fixedLook = new THREE.Vector3();
+  /** Next update jumps straight to the target (scene cut). */
+  private cutNext = false;
 
   constructor(private camera: THREE.PerspectiveCamera) {}
 
   setAspect(aspect: number) {
     // Narrow phones need a slightly wider FOV to keep the track visible.
     this.baseFov = aspect < 0.5 ? 60 : aspect < 0.6 ? 57 : 52;
+    this.aspect = aspect;
+  }
+
+  get viewAspect() {
+    return this.aspect;
+  }
+
+  /** Pose used by the 'chest' mode. */
+  setFixedPose(pos: THREE.Vector3, look: THREE.Vector3) {
+    this.fixedPos.copy(pos);
+    this.fixedLook.copy(look);
+  }
+
+  /** Hard cut on the next frame (no travel through the level). */
+  cut() {
+    this.cutNext = true;
   }
 
   shake(amount: number) {
@@ -52,7 +74,14 @@ export class CameraRig {
     this.radius += (radius - this.radius) * damp(2, dt);
     this.orbit += dt;
     this.compute(x, z, dt);
-    const k = this.mode === 'play' ? damp(6, dt) : damp(2.6, dt);
+    if (this.cutNext) {
+      this.cutNext = false;
+      this.pos.copy(_target);
+      this.look.copy(_look);
+      this.apply(dt);
+      return;
+    }
+    const k = this.mode === 'play' ? damp(6, dt) : this.mode === 'chest' ? damp(8, dt) : damp(2.6, dt);
     this.pos.lerp(_target, k);
     this.look.lerp(_look, this.mode === 'play' ? damp(8, dt) : k);
     this.apply(dt);
@@ -74,6 +103,10 @@ export class CameraRig {
       case 'play':
         _target.set(x * 0.55, 6.4 + R * 1.15, wzc + 8.4 + R * 1.5);
         _look.set(x * 0.8, 0.6, wzc - 12);
+        break;
+      case 'chest':
+        _target.copy(this.fixedPos);
+        _look.copy(this.fixedLook);
         break;
       case 'finish': {
         // High, slightly swaying view down the stall corridor.

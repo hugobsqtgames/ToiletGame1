@@ -182,6 +182,7 @@ export const en = {
   chestEmpty: 'Win levels to fill the chest meter!',
   youGot: 'You got',
   newSkin: 'NEW SKIN!',
+  chestNext: 'OPEN NEXT ({n})',
   // World
   worldUnlocked: 'NEW WORLD!',
   worldMapTitle: 'Worlds',

@@ -11,6 +11,7 @@ import { audio } from '../services/audio';
 import { haptics } from '../services/haptics';
 import { hud } from '../state/hud';
 import { CameraRig, type CamMode } from './CameraRig';
+import { ChestStage, type ChestKind, type ChestPhase } from './ChestStage';
 import { characterGeometry } from './characters';
 import { CrowdView } from './CrowdView';
 import { Pill } from './geo';
@@ -70,6 +71,10 @@ export class GameController {
   /** Debug/QA only: stops the simulation while rendering continues (screenshots). */
   debugFreeze = false;
   private autoplayTimer = 0;
+  /** 3D chest-opening stage (always in the scene, hidden when unused). */
+  readonly chest = new ChestStage();
+  private chestPrevMode: CamMode = 'menu';
+  private chestListener: ((p: ChestPhase) => void) | null = null;
 
   constructor() {
     const labelMat = textMaterial('#FFFFFF', { depthTest: false });
@@ -80,7 +85,26 @@ export class GameController {
     this.countPill.renderOrder = 10;
     this.countGroup.add(this.countPill, this.countLabel);
     this.sun.position.set(-6, 14, 8);
-    this.root.add(this.hemi, this.sun, this.sun.target, this.fx, this.countGroup);
+    this.root.add(this.hemi, this.sun, this.sun.target, this.fx, this.countGroup, this.chest);
+    this.chest.onPhase = (p) => this.chestListener?.(p);
+    this.chest.onLand = () => {
+      audio.play('stall', 0.7);
+      haptics.medium();
+      this.rig?.shake(0.35);
+    };
+    this.chest.onKnock = (i) => {
+      audio.play('tap', 0.9 + i * 0.25);
+      audio.play('pop', 0.8 + i * 0.2);
+      haptics.light();
+      this.rig?.shake(0.12 + i * 0.1);
+    };
+    this.chest.onBurst = () => {
+      audio.play('chest_open');
+      audio.play('unlock');
+      haptics.success();
+      this.rig?.shake(0.6);
+      this.rig?.punch(8);
+    };
   }
 
   setCallbacks(cb: ControllerCallbacks) {
@@ -175,6 +199,7 @@ export class GameController {
   }
 
   setCameraMode(mode: CamMode) {
+    if ((mode === 'chest') !== (this.camMode === 'chest')) this.rig?.cut();
     this.camMode = mode;
     if (this.rig) this.rig.mode = mode;
         if (mode === 'showcase') this.showcaseTime = 0;
@@ -217,6 +242,37 @@ export class GameController {
     audio.play('unlock');
     haptics.success();
     hud.set({ phase: this.sim.s.phase, count: this.sim.s.count });
+  }
+
+  /* ---------------- chest opening ---------------- */
+
+  /** Shows the 3D chest stage (the level is hidden behind it). */
+  showChest(kind: ChestKind, onPhase: (p: ChestPhase) => void) {
+    this.chestListener = onPhase;
+    if (this.camMode !== 'chest') this.chestPrevMode = this.camMode;
+    this.chest.show(kind);
+    if (this.level) this.level.visible = false;
+    if (this.crowd) this.crowd.visible = false;
+    if (this.camera && this.rig) {
+      const pos = new THREE.Vector3(), look = new THREE.Vector3();
+      this.chest.cameraPose(pos, look, this.rig.viewAspect);
+      this.rig.setFixedPose(pos, look);
+    }
+    this.setCameraMode('chest');
+    audio.play('whoosh');
+  }
+
+  /** Player tap on the chest. */
+  tapChest() {
+    return this.chest.tap();
+  }
+
+  hideChest() {
+    this.chestListener = null;
+    this.chest.hide();
+    if (this.level) this.level.visible = true;
+    if (this.crowd) this.crowd.visible = true;
+    this.setCameraMode(this.chestPrevMode === 'chest' ? 'menu' : this.chestPrevMode);
   }
 
   /* ---------------- frame ---------------- */
@@ -268,6 +324,7 @@ export class GameController {
     this.showcaseTime += dt;
     this.level.update(sim, vdt, this.camera);
     this.fx.update(vdt, this.camera);
+    if (this.chest.visible) this.chest.update(dt, this.camera);
 
     // Count bubble above the crowd.
     if (s.count !== this.lastCount) {

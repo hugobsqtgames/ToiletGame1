@@ -172,6 +172,7 @@ export const fr: Dict = {
   chestTap: 'Touche pour ouvrir !',
   chestEmpty: 'Gagne des niveaux pour remplir la jauge !',
   youGot: 'Tu as gagné',
+  chestNext: 'OUVRIR LE SUIVANT ({n})',
   newSkin: 'NOUVEAU SKIN !',
   worldUnlocked: 'NOUVEAU MONDE !',
   worldMapTitle: 'Mondes',

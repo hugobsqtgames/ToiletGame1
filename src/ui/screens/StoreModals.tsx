@@ -18,7 +18,9 @@ import { app } from '../../state/app';
 import { useStore } from '../../state/store';
 import { useNow, useAnimatedValue } from '../hooks';
 import { getLanguage, t, tk } from '../i18n';
-import { CloseButton, CoinIcon, CurrencyPill, GameButton, GemIcon, Pulse, RewardChips, Sheet, Txt, lighten, styles as kit } from '../components/kit';
+import { CloseButton, CoinIcon, CurrencyPill, GameButton, GemIcon, KeyIcon, Pulse, Sheet, Txt, lighten, styles as kit } from '../components/kit';
+import { game } from '../../render/GameController';
+import type { ChestPhase } from '../../render/ChestStage';
 import { colors, radius, shadow } from '../theme';
 
 /* ---------------- Shop ---------------- */
@@ -236,55 +238,38 @@ function SkinTile({ skin, owned, selected, focused, onPress }: { skin: SkinDef; 
 
 /* ---------------- Chests ---------------- */
 
+type ChestTier = 'basic' | 'epic' | 'keys';
+
 export function ChestModal() {
   const save = useStore(app, (s) => s.save);
-  const [opening, setOpening] = useState<{ tier: 'basic' | 'epic' | 'keys'; reward: Reward | null } | null>(null);
-  const shake = useAnimatedValue(0);
-  const burst = useAnimatedValue(0);
+  const [opening, setOpening] = useState<{ tier: ChestTier; reward: Reward; n: number } | null>(null);
+  // Never leave the menu hidden if the modal is closed mid-reveal (e.g. Android back).
+  useEffect(() => () => app.set({ cinematic: false }), []);
 
-  const start = (tier: 'basic' | 'epic' | 'keys') => {
-    setOpening({ tier, reward: null });
-    shake.setValue(0);
-    burst.setValue(0);
-    audio.play('whoosh');
-    Animated.sequence([
-      Animated.timing(shake, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }),
-      Animated.spring(burst, { toValue: 1, useNativeDriver: true, bounciness: 12 }),
-    ]).start();
-    setTimeout(() => {
-      const r = openChest(tier);
-      audio.play('chest_open');
-      haptics.success();
-      setOpening({ tier, reward: r });
-    }, 900);
+  const start = (tier: ChestTier) => {
+    // The reward is rolled and saved BEFORE the animation: quitting mid-reveal can't reroll it.
+    const r = openChest(tier);
+    if (!r) return;
+    app.set({ cinematic: true });
+    setOpening((o) => ({ tier, reward: r, n: (o?.n ?? 0) + 1 }));
   };
+  const finish = () => {
+    app.set({ cinematic: false });
+    setOpening(null);
+  };
+  const left = (tier: ChestTier) => (tier === 'epic' ? save.chest.epic : tier === 'basic' ? save.chest.basic : Math.floor(save.keys / KEYS_PER_CHEST));
 
   if (opening) {
-    const r = opening.reward;
-    const color = opening.tier === 'epic' ? colors.gold : '#C68B59';
+    const more = left(opening.tier);
     return (
-      <View style={[StyleSheet.absoluteFill, kit.center, { backgroundColor: colors.scrim }]}>
-        <Animated.View
-          style={{
-            transform: [
-              { rotate: shake.interpolate({ inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1], outputRange: ['0deg', '-8deg', '8deg', '-10deg', '10deg', '-12deg', '12deg', '-14deg', '14deg', '-6deg', '0deg'] }) },
-              { scale: burst.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] }) },
-            ],
-          }}
-        >
-          <MaterialCommunityIcons name={r ? 'treasure-chest-outline' : 'treasure-chest'} size={150} color={color} />
-        </Animated.View>
-        {r ? (
-          <Animated.View style={[s.rewardCard, { opacity: burst, transform: [{ scale: burst }] }]}>
-            <Txt display size={24}>{t('youGot')}</Txt>
-            {r.skin ? <Txt display size={18} color={colors.purple}>{t('newSkin')} {skinById(r.skin).name[getLanguage()]}</Txt> : null}
-            <RewardChips reward={{ ...r, skin: undefined }} size="l" />
-            <GameButton label={t('ok')} onPress={() => setOpening(null)} style={{ width: 200, marginTop: 10 }} testID="btn-chest-ok" />
-          </Animated.View>
-        ) : (
-          <Txt display size={22} color="#fff" outline style={{ marginTop: 10 }}>{t('chestTap')}</Txt>
-        )}
-      </View>
+      <ChestReveal
+        key={opening.n}
+        tier={opening.tier}
+        reward={opening.reward}
+        onDone={finish}
+        onNext={more > 0 ? () => start(opening.tier) : undefined}
+        nextCount={more}
+      />
     );
   }
 
@@ -320,6 +305,140 @@ export function ChestModal() {
   );
 }
 
+/* ---------------- 3D chest reveal ---------------- */
+
+type RevealItem = { key: string; kind: 'coins' | 'gems' | 'keys' | 'skin'; value: number; skin?: string };
+
+function revealItems(r: Reward): RevealItem[] {
+  const out: RevealItem[] = [];
+  if (r.skin) out.push({ key: 's', kind: 'skin', value: 1, skin: r.skin });
+  if (r.coins) out.push({ key: 'c', kind: 'coins', value: r.coins });
+  if (r.gems) out.push({ key: 'g', kind: 'gems', value: r.gems });
+  if (r.keys) out.push({ key: 'k', kind: 'keys', value: r.keys });
+  return out;
+}
+
+const CHEST_NAME: Record<ChestTier, 'chestBasic' | 'chestEpic' | 'chestKeys'> = { basic: 'chestBasic', epic: 'chestEpic', keys: 'chestKeys' };
+const CHEST_COLOR: Record<ChestTier, string> = { basic: '#FFB357', epic: colors.gold, keys: '#9BE7FF' };
+
+/** Full-screen reveal: the chest itself is 3D (render/ChestStage), this is the UI layer above it. */
+function ChestReveal({ tier, reward, onDone, onNext, nextCount }: { tier: ChestTier; reward: Reward; onDone: () => void; onNext?: () => void; nextCount: number }) {
+  const insets = useSafeAreaInsets();
+  const [phase, setPhase] = useState<ChestPhase>('drop');
+  const [shown, setShown] = useState(0);
+  const flash = useAnimatedValue(0);
+  const intro = useAnimatedValue(0);
+  const hint = useAnimatedValue(0);
+  const [items] = useState(() => revealItems(reward));
+
+  useEffect(() => {
+    game.showChest(tier === 'keys' ? 'keys' : tier, setPhase);
+    Animated.timing(intro, { toValue: 1, duration: 450, easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }).start();
+    return () => game.hideChest();
+  }, [tier, intro]);
+
+  useEffect(() => {
+    if (phase === 'idle') {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(hint, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(hint, { toValue: 0.35, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => loop.stop();
+    }
+    if (phase !== 'open') return;
+    flash.setValue(0.9);
+    Animated.timing(flash, { toValue: 0, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    const timers = items.map((it, i) => setTimeout(() => {
+      setShown(i + 1);
+      audio.play(it.kind === 'skin' ? 'unlock' : it.kind === 'coins' ? 'coin' : 'gain', 1 + i * 0.08);
+      haptics.light();
+    }, 650 + i * 420));
+    const end = setTimeout(() => setShown(items.length + 1), 650 + items.length * 420 + 150);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(end);
+    };
+  }, [phase, items, flash, hint]);
+
+  const tap = () => {
+    if (phase === 'idle') game.tapChest();
+  };
+  const done = shown > items.length;
+
+  return (
+    <Pressable style={StyleSheet.absoluteFill} onPress={tap} testID="chest-tap">
+      <Animated.View style={[s.revealTop, { paddingTop: insets.top + 18, opacity: intro, transform: [{ translateY: intro.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] }) }] }]}>
+        <Txt display size={38} color="#fff" outline>{t(CHEST_NAME[tier])}</Txt>
+        <View style={[s.revealTag, { backgroundColor: CHEST_COLOR[tier] }]}>
+          <Txt display size={14} color={colors.ink}>{tier === 'epic' ? tk('rarity_epic') : tier === 'keys' ? t('chestKeysDesc', { n: KEYS_PER_CHEST, m: KEYS_PER_CHEST }) : tk('rarity_common')}</Txt>
+        </View>
+      </Animated.View>
+
+      <View style={[s.revealBottom, { paddingBottom: insets.bottom + 26 }]} pointerEvents="box-none">
+        {phase === 'idle' || phase === 'drop' || phase === 'charge' ? (
+          <Animated.View style={{ opacity: phase === 'idle' ? hint : 0, transform: [{ scale: hint.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] }) }] }}>
+            <Txt display size={30} color="#fff" outline align="center">{t('chestTap')}</Txt>
+          </Animated.View>
+        ) : null}
+        {phase === 'open' ? (
+          <View style={{ alignItems: 'center', gap: 12, width: '100%' }}>
+            <View style={s.revealItems}>
+              {items.slice(0, shown).map((it) => <RevealCard key={it.key} item={it} />)}
+            </View>
+            {done ? (
+              <FadeIn>
+                <View style={{ alignItems: 'center', gap: 10 }}>
+                  {onNext ? <GameButton label={t('chestNext', { n: nextCount })} onPress={onNext} color={colors.warn} dark={colors.warnDark} style={{ width: 260 }} testID="btn-chest-next" /> : null}
+                  <GameButton label={t('ok')} onPress={onDone} style={{ width: 200 }} testID="btn-chest-ok" />
+                </View>
+              </FadeIn>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', opacity: flash }]} />
+    </Pressable>
+  );
+}
+
+function FadeIn({ children }: { children: React.ReactNode }) {
+  const v = useAnimatedValue(0);
+  useEffect(() => {
+    Animated.timing(v, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+  }, [v]);
+  return <Animated.View style={{ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }}>{children}</Animated.View>;
+}
+
+function RevealCard({ item }: { item: RevealItem }) {
+  const v = useAnimatedValue(0);
+  useEffect(() => {
+    Animated.spring(v, { toValue: 1, useNativeDriver: true, friction: 5, tension: 140 }).start();
+  }, [v]);
+  const style = { opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }, { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] };
+  if (item.kind === 'skin' && item.skin) {
+    const sk = skinById(item.skin);
+    return (
+      <Animated.View style={[s.revealSkin, style]}>
+        <LinearGradient colors={[colors.purple, colors.purpleDark]} style={s.revealSkinInner}>
+          <Txt display size={16} color={colors.gold}>{t('newSkin')}</Txt>
+          <View style={[s.revealSkinDot, { backgroundColor: sk.body, borderColor: sk.accColor }]} />
+          <Txt display size={20} color="#fff" align="center">{sk.name[getLanguage()]}</Txt>
+          <Txt display size={12} color={colors.rarity[sk.rarity]}>{tk('rarity_' + sk.rarity)}</Txt>
+        </LinearGradient>
+      </Animated.View>
+    );
+  }
+  const icon = item.kind === 'coins' ? <CoinIcon size={40} /> : item.kind === 'gems' ? <GemIcon size={40} /> : <KeyIcon size={36} />;
+  return (
+    <Animated.View style={[s.revealCard, style]}>
+      {icon}
+      <Txt display size={30} style={{ marginTop: 4 }}>+{formatCount(item.value)}</Txt>
+    </Animated.View>
+  );
+}
+
 const s = StyleSheet.create({
   darkPill: { backgroundColor: '#5B6A9A', borderRadius: 22 },
   notice: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF1D6', borderRadius: radius.s, padding: 10 },
@@ -344,5 +463,13 @@ const s = StyleSheet.create({
   mAcc: { position: 'absolute', top: -6, width: 26, height: 10, borderRadius: 5, zIndex: 3 },
   lockBox: { backgroundColor: '#EEF1FA', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
   chestRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: radius.m, padding: 10, borderWidth: 2, borderColor: colors.line },
+  revealTop: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 8 },
+  revealTag: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 3 },
+  revealBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 18 },
+  revealItems: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
+  revealCard: { width: 104, height: 112, borderRadius: radius.l, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#fff', ...shadow },
+  revealSkin: { borderRadius: radius.l, borderWidth: 4, borderColor: '#fff', overflow: 'hidden', ...shadow },
+  revealSkinInner: { width: 150, height: 112, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 8 },
+  revealSkinDot: { width: 30, height: 30, borderRadius: 15, borderWidth: 4, marginVertical: 2 },
   rewardCard: { marginTop: 10, width: '86%', maxWidth: 380, backgroundColor: colors.paper, borderRadius: radius.xl, padding: 18, alignItems: 'center', gap: 10, borderWidth: 4, borderColor: '#fff', ...shadow },
 });

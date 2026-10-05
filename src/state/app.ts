@@ -56,6 +56,8 @@ export interface AppState {
   foreground: boolean;
   /** Runtime quality downgrade decided by the frame-time monitor (Auto mode only). */
   qualityOverride: 'low' | 'medium' | null;
+  /** Full-screen 3D moment (chest opening): menu UI is hidden. */
+  cinematic: boolean;
 }
 
 export const app = createStore<AppState>({
@@ -73,4 +75,5 @@ export const app = createStore<AppState>({
   lang: 'en',
   foreground: true,
   qualityOverride: null,
+  cinematic: false,
 });

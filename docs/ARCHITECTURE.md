@@ -59,7 +59,8 @@ src/
     CrowdView.ts      instanced crowd (3 draw calls + shadows for up to 220 members)
     characters.ts     procedural character + accessory geometry per skin
     Fx.ts             pooled particles, knocked-out flyers, floating texts
-    CameraRig.ts      follow camera (menu / play / finish / showcase), shake, FOV punch
+    CameraRig.ts      follow camera (menu / play / finish / showcase / chest), shake, FOV punch
+    ChestStage.ts     3D chest-opening stage: 3 procedural chests, drop/tap/charge/burst, rays, coin & gem bursts
     text3d.ts         smooth extruded 3D text in Lilita One (fonts/lilita.json, scripts/gen-font.js)
     environment/      world scenery: kits.ts (props of the 8 worlds), build.ts (ground, prop rows,
                       edges, "WC 150M" signs, giant restroom landmark, sky)

@@ -52,6 +52,7 @@ export default function App() {
   const modal = useStore(app, (s) => s.modal);
   const quality = useStore(app, (s) => resolveQuality(s.save, s.qualityOverride));
   const foreground = useStore(app, (s) => s.foreground);
+  const cinematic = useStore(app, (s) => s.cinematic);
 
   // A font failure must never block the game: fall back to system fonts.
   const fontsLoaded = fontsReady || !!fontError;
@@ -70,7 +71,7 @@ export default function App() {
       <View style={styles.root}>
         <StatusBar style="light" hidden={screen === 'play'} />
         <GameCanvas active={active} dpr={dprFor(quality)} />
-        {screen === 'home' && modal !== 'skins' ? <HomeScreen /> : null}
+        {screen === 'home' && modal !== 'skins' && !cinematic ? <HomeScreen /> : null}
         {screen === 'play' && modal !== 'skins' ? <PlayScreen /> : null}
         {Modal ? <Modal /> : null}
         {screen === 'boot' || !fontsLoaded ? <BootScreen /> : null}

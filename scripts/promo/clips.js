@@ -110,4 +110,24 @@ module.exports = {
       await c.tapFilm('open-epic', 3.4);
     },
   },
+
+  /* Chest openings (3D stage): drop → idle → tap → charge → burst → rewards. */
+  chestEpic: chestClip('epic'),
+  chestBasic: chestClip('basic'),
+  chestKeys: chestClip('keys'),
 };
+
+function chestClip(tier) {
+  return {
+    save: 'home',
+    async run(c) {
+      await boot(c, 8000);
+      await c.tid('btn-chest');
+      await c.wait(1200);
+      await c.mark('open');
+      await c.tapFilm(`open-${tier}`, 1.9);
+      await c.mark('tap');
+      await c.tapFilm('chest-tap', 4.4);
+    },
+  };
+}
