@@ -138,6 +138,31 @@ function sfx() {
   b = buf(0.3); noise(b, 0, 0.3, (t) => Math.sin((Math.PI * t) / 0.3), 1, (t) => 0.05 + t * 2); writeWav('whoosh', b, 0.45);
 
   b = buf(0.22); tone(b, 0, 0.22, () => midi(79), perc(0.002, 0.08), 'tri', 1); tone(b, 0, 0.22, () => midi(91), perc(0.002, 0.05), 'sine', 0.3); writeWav('stall', b, 0.6);
+
+  // Brawl: seamless 1.6 s loop played for the whole rival battle (one native
+  // play per battle instead of dozens of hits). Hits past the end wrap around.
+  {
+    const L = 1.6;
+    b = buf(L + 0.3);
+    let t = 0;
+    let k = 0;
+    while (t < L) {
+      const kind = k++ % 3;
+      if (kind === 0) {
+        noise(b, t, 0.12, perc(0.002, 0.035), 0.8, 0.28);
+        tone(b, t, 0.1, (x) => 130 - 380 * x, perc(0.002, 0.035), 'sine', 0.7);
+      } else if (kind === 1) {
+        noise(b, t, 0.05, perc(0.001, 0.012), 0.6, 0.85);
+      } else {
+        tone(b, t, 0.07, (x) => 620 * Math.pow(0.35, x / 0.07), perc(0.002, 0.025), 'sine', 0.35);
+        noise(b, t, 0.08, perc(0.002, 0.025), 0.4, 0.5);
+      }
+      t += 0.06 + (rand() * 0.5 + 0.5) * 0.08;
+    }
+    const n = Math.ceil(L * SR);
+    for (let i = n; i < b.length; i++) b[i - n] += b[i];
+    writeWav('brawl', b.subarray(0, n), 0.6);
+  }
 }
 
 /* Music lives in scripts/gen-music.js (full soundtrack). */

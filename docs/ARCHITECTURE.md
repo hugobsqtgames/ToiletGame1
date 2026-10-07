@@ -56,7 +56,7 @@ src/
     GameController.ts sim ↔ visuals ↔ audio/haptics bridge, fixed-step loop
     GameCanvas.tsx    the single r3f Canvas; r3f(.native).ts picks the right entry
     LevelView.ts      track, decor, gates, obstacles, pickups, rivals, finish stalls
-    CrowdView.ts      instanced crowd (3 draw calls + shadows for up to 220 members)
+    CrowdView.ts      instanced crowd (2 draw calls + shadows for up to 220 members)
     characters.ts     procedural character + accessory geometry per skin
     Fx.ts             pooled particles, knocked-out flyers, floating texts
     CameraRig.ts      follow camera (menu / play / finish / showcase / chest), shake, FOV punch
@@ -96,7 +96,11 @@ assets/        icon, splash, generated audio
 
 | Topic | Technique |
 |---|---|
-| Crowd | `InstancedMesh` per part (body, left leg, right leg, blob shadow): **4 draw calls for 220 animated characters**. Skin colors baked as vertex colors. Character ≈ 650 vertices (indexed). |
+| JS budget (iOS) | Hermes has no JIT and every draw call / GL call / native call runs on the JS thread, so the budget is **JS time per frame**, measured with a real Hermes VM against a stub GL context (`frame()` + `renderer.render()`): ≈ 0.6–0.9 ms of game logic + ≈ 3–4 ms of three.js for ~75 draw calls (level 25). |
+| Crowd | Body + both legs (one InstancedMesh, 2 instances per member) + blob shadow: **3 draw calls for 220 animated characters**. Instance matrices are written by hand (no Euler/quaternion/compose), checked against the three.js math in `__tests__/crowdview.test.ts`. Skin colors baked as vertex colors. |
+| View distance | Camera far plane = 190 m, just past the fog end; the sky (dome, clouds, stars, moon) follows the camera and is scaled ×0.55 so it stays inside. Nothing visible changes, but everything beyond the fog is culled instead of drawn. |
+| Text | Labels that rarely change (gate values, floating "+15") are baked into **one mesh** per label; counters that change every frame keep one shared-glyph mesh per character (no rebuild). Static baked labels are cached across levels. |
+| Audio (iOS) | Every expo-audio `play()` is a synchronous native call that also re-activates the audio session. SFX players are pre-rewound after use (no seek/rate change at play time), pitch variants are preset players, minor sounds share a per-second budget, and battles use ONE looping brawl sound. |
 | Count vs visuals | Up to 220 simulated & rendered members; beyond that each member represents `count / 220` people and losses are weighted, so the number shown always matches what you see happen. |
 | Level geometry | Track and static props merged into **one indexed vertex-colored mesh**; every scenery prop type is **one InstancedMesh** (+1 for its unlit "glow" parts: windows, screens, lamps). A fully decorated level ≈ 250–340k vertices, ~150–220 meshes (most are frustum-culled gate/label glyphs). |
 | Effects | Pooled instanced particles (360) and flyers (70); no allocation during gameplay. |
@@ -105,6 +109,7 @@ assets/        icon, splash, generated audio
 | Battery | Render loop **stops** while backgrounded (`frameloop="never"`), the run auto-pauses, music suspends. |
 | Adaptive quality | `Auto` quality picks DPR by device; a frame-time monitor steps down (high → medium → low) if frames stay >26 ms for 4 s. |
 | Collisions | Per-member tests only for obstacles within the crowd's z window; O(members × nearby obstacles). |
+| Level build | `mergeParts` transforms straight from the source arrays (no clone); ~0.3–0.6 s per level under Hermes (was 1.1–1.8 s). |
 
 ## 5. Save system
 

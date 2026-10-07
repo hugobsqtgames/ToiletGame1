@@ -1,6 +1,6 @@
 # QA, audit & known limitations
 
-## Automated tests (`npm test`, 1,422 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
+## Automated tests (`npm test`, 1,434 tests — the stress/fuzz/monkey battery is described in [TESTING.md](TESTING.md))
 * **Gates**: every operation, clamping at 9,999,999, timed gates, labels.
 * **Level generation**: deterministic per seed; not a modulo loop (levels n and n+10/20/40/80/800 differ);
   levels 1–3000 + 10 000, 123 456, 9 999 999 are all valid (finite numbers, bounds, rivals > 0, finish corridor
@@ -35,7 +35,7 @@ Balancing: `npm run balance` (planner win rates: 100% levels 2–80, ~95% 100–
 * iOS production bundle inspected: no `three.cjs`, no Node-only API, no debug hooks.
 
 ## Final pre-release pass (soundtrack build)
-* Jest **1,422 / 1,422**, lint + typecheck clean, `expo-doctor` 21/21, iOS export + prebuild verified (6 AAC loops +
+* Jest **1,434 / 1,434**, lint + typecheck clean, `expo-doctor` 21/21, iOS export + prebuild verified (6 AAC loops +
   17 SFX bundled, privacy manifest, en/fr strings, no microphone key, no debug code).
 * UI monkey: 1,800 random actions on the final web build → 0 problems; real playback check: menu theme on home,
   crossfade to the world's track (e.g. Surf in Splash Park) on PLAY, no media errors; chest stress → exact counts.

@@ -63,7 +63,7 @@ export class Fx extends THREE.Group {
     this.add(this.parts, this.flyers);
     for (let i = 0; i < 6; i++) {
       const mat = textMaterial('#FFFFFF', { transparent: true, depthTest: false });
-      const label = new TextLabel(mat, 0.7, 6);
+      const label = new TextLabel(mat, 0.7, 0, 'center', true);
       label.visible = false;
       label.renderOrder = 20;
       this.labels.push({ label, mat, life: 0, vy: 0, vz: 0 });

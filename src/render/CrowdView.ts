@@ -6,27 +6,28 @@ import { blobShadowGeometry } from './geo';
 import { characterGeometry, HIP_X, HIP_Y, type Look } from './characters';
 
 /**
- * Instanced crowd: 3 draw calls for the bodies (+1 for shadows) regardless of
+ * Instanced crowd: 2 draw calls for the bodies (+1 for shadows) regardless of
  * the number of members. Visual slot i mirrors logic slot i of the simulation
  * so what you see is exactly what collides.
  */
 export type CrowdMode = 'idle' | 'run' | 'fight' | 'cheer';
 
 const MAX = LOGIC_MEMBER_CAP;
-const _m = new THREE.Matrix4();
-const _leg = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
-const _e = new THREE.Euler();
-const _p = new THREE.Vector3();
-const _s = new THREE.Vector3();
-const _hip = new THREE.Matrix4();
+
+/** Writes a column-major 4×4 affine matrix (3 columns + translation) at offset o. */
+function writeMat(a: Float32Array, o: number, x0: number, x1: number, x2: number, y0: number, y1: number, y2: number, z0: number, z1: number, z2: number, tx: number, ty: number, tz: number) {
+  a[o] = x0; a[o + 1] = x1; a[o + 2] = x2; a[o + 3] = 0;
+  a[o + 4] = y0; a[o + 5] = y1; a[o + 6] = y2; a[o + 7] = 0;
+  a[o + 8] = z0; a[o + 9] = z1; a[o + 10] = z2; a[o + 11] = 0;
+  a[o + 12] = tx; a[o + 13] = ty; a[o + 14] = tz; a[o + 15] = 1;
+}
 
 let sharedShadowGeo: THREE.BufferGeometry | null = null;
 
 export class CrowdView extends THREE.Group {
   private upper: THREE.InstancedMesh;
-  private legL: THREE.InstancedMesh;
-  private legR: THREE.InstancedMesh;
+  /** Both legs in one mesh: instance 2k = left leg of member k, 2k+1 = right leg. */
+  private legs: THREE.InstancedMesh;
   private shadows: THREE.InstancedMesh;
   private material: THREE.MeshLambertMaterial;
   private shadowMat: THREE.MeshBasicMaterial;
@@ -48,14 +49,13 @@ export class CrowdView extends THREE.Group {
     const geo = characterGeometry(key, look);
     this.material = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.upper = new THREE.InstancedMesh(geo.upper, this.material, MAX);
-    this.legL = new THREE.InstancedMesh(geo.leg, this.material, MAX);
-    this.legR = new THREE.InstancedMesh(geo.leg, this.material, MAX);
+    this.legs = new THREE.InstancedMesh(geo.leg, this.material, MAX * 2);
     sharedShadowGeo ??= Object.assign(blobShadowGeometry(), {});
     sharedShadowGeo.userData.shared = true;
     this.shadowMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false });
     this.shadows = new THREE.InstancedMesh(sharedShadowGeo, this.shadowMat, MAX);
     this.shadows.renderOrder = 1;
-    for (const m of [this.upper, this.legL, this.legR, this.shadows]) {
+    for (const m of [this.upper, this.legs, this.shadows]) {
       m.frustumCulled = false; // bounds change every frame; the crowd is always on screen
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.count = 0;
@@ -70,8 +70,7 @@ export class CrowdView extends THREE.Group {
   setLook(look: Look, key: string) {
     const geo = characterGeometry(key, look);
     this.upper.geometry = geo.upper;
-    this.legL.geometry = geo.leg;
-    this.legR.geometry = geo.leg;
+    this.legs.geometry = geo.leg;
   }
 
   setFacing(rad: number, instant = false) {
@@ -123,6 +122,9 @@ export class CrowdView extends THREE.Group {
     const running = this.mode === 'run';
     const legAmp = running ? 0.75 : this.mode === 'fight' ? 0.5 : this.mode === 'cheer' ? 0.25 : 0.12;
     const freq = running ? 13 : this.mode === 'fight' ? 16 : this.mode === 'cheer' ? 9 : 3;
+    const up = this.upper.instanceMatrix.array as Float32Array;
+    const lg = this.legs.instanceMatrix.array as Float32Array;
+    const sh = this.shadows.instanceMatrix.array as Float32Array;
     let n = 0;
     for (let i = 0; i < MAX; i++) {
       const target = this.visible_[i] ? 1 : 0;
@@ -148,33 +150,45 @@ export class CrowdView extends THREE.Group {
         bob = Math.abs(sw) * 0.06;
       }
       const s = this.sc[i] * this.sizeScale * (0.94 + 0.12 * (this.jitter[i] - 0.9) * 5);
-      _p.set(this.px[i], bob, -this.pz[i]);
-      _e.set(lean, yaw, sw * (running ? 0.06 : 0.02));
-      _q.setFromEuler(_e);
-      _s.set(s, s * (1 + 0.04 * Math.cos(ph * 2)), s); // tiny squash & stretch
-      _m.compose(_p, _q, _s);
-      this.upper.setMatrixAt(n, _m);
-      // Legs swing around the hip.
-      _hip.makeTranslation(-HIP_X, HIP_Y, 0);
-      _leg.makeRotationX(sw * legAmp);
-      _hip.multiply(_leg);
-      this.legL.setMatrixAt(n, _leg.multiplyMatrices(_m, _hip));
-      _hip.makeTranslation(HIP_X, HIP_Y, 0);
-      _leg.makeRotationX(-sw * legAmp);
-      _hip.multiply(_leg);
-      this.legR.setMatrixAt(n, _leg.multiplyMatrices(_m, _hip));
+      const roll = sw * (running ? 0.06 : 0.02);
+      // Matrices written by hand (no Euler → quaternion → compose, no generic
+      // multiplies): this loop runs for up to 2 × 220 members per frame and is
+      // the biggest JS cost of a frame on iOS (Hermes has no JIT).
+      // Upper body = T(p) · R(lean, yaw, roll as Euler XYZ) · S(s, s·squash, s).
+      const ca = Math.cos(lean), sa = Math.sin(lean);
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const cz = Math.cos(roll), sz = Math.sin(roll);
+      const sq = s * (1 + 0.04 * Math.cos(ph * 2)); // tiny squash & stretch
+      const ae = ca * cz, af = ca * sz, be = sa * cz, bf = sa * sz;
+      const m00 = cy * cz * s, m10 = (af + be * sy) * s, m20 = (bf - ae * sy) * s;
+      const m01 = -cy * sz * sq, m11 = (ae - bf * sy) * sq, m21 = (be + af * sy) * sq;
+      const m02 = sy * s, m12 = -sa * cy * s, m22 = ca * cy * s;
+      const px = this.px[i], py = bob, pz = -this.pz[i];
+      const o = n * 16;
+      writeMat(up, o, m00, m10, m20, m01, m11, m21, m02, m12, m22, px, py, pz);
+      // Legs swing around the hip: M · T(±HIP_X, HIP_Y, 0) · Rx(±swing).
+      const sl = Math.sin(sw * legAmp), cl = Math.cos(sw * legAmp);
+      const hx = px + HIP_Y * m01, hy = py + HIP_Y * m11, hz = pz + HIP_Y * m21;
+      writeMat(
+        lg, o * 2, m00, m10, m20,
+        cl * m01 + sl * m02, cl * m11 + sl * m12, cl * m21 + sl * m22,
+        -sl * m01 + cl * m02, -sl * m11 + cl * m12, -sl * m21 + cl * m22,
+        hx - HIP_X * m00, hy - HIP_X * m10, hz - HIP_X * m20,
+      );
+      writeMat(
+        lg, o * 2 + 16, m00, m10, m20,
+        cl * m01 - sl * m02, cl * m11 - sl * m12, cl * m21 - sl * m22,
+        sl * m01 + cl * m02, sl * m11 + cl * m12, sl * m21 + cl * m22,
+        hx + HIP_X * m00, hy + HIP_X * m10, hz + HIP_X * m20,
+      );
       // Blob shadow stays on the ground.
       const ss = 0.16 * s * (1 - bob * 1.5);
-      _p.set(this.px[i], 0.012, -this.pz[i]);
-      _q.identity();
-      _s.set(ss, 1, ss);
-      _m.compose(_p, _q, _s);
-      this.shadows.setMatrixAt(n, _m);
+      writeMat(sh, o, ss, 0, 0, 0, 1, 0, 0, 0, ss, px, 0.012, pz);
       n++;
     }
     this.shown = n;
-    for (const m of [this.upper, this.legL, this.legR, this.shadows]) {
-      m.count = n;
+    for (const m of [this.upper, this.legs, this.shadows]) {
+      m.count = m === this.legs ? n * 2 : n;
       m.instanceMatrix.needsUpdate = true;
     }
   }
@@ -192,8 +206,7 @@ export class CrowdView extends THREE.Group {
     this.material.dispose();
     this.shadowMat.dispose();
     this.upper.dispose();
-    this.legL.dispose();
-    this.legR.dispose();
+    this.legs.dispose();
     this.shadows.dispose();
   }
 }

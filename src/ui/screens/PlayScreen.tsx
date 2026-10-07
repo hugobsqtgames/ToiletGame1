@@ -23,13 +23,10 @@ export function PlayScreen() {
   const run = useStore(app, (s) => s.run);
   const modal = useStore(app, (s) => s.modal);
   const seen = useStore(app, (s) => s.save.seenMechanics);
+  // Only slow-changing values here: fast ones (count, progress, coins) live in
+  // small leaf components so a HUD tick never re-renders the whole screen.
   const phase = useStore(hud, (h) => h.phase);
-  const progress = useStore(hud, (h) => h.progress);
-  const coins = useStore(hud, (h) => h.coins);
-  const keys = useStore(hud, (h) => h.keys);
-  const rival = useStore(hud, (h) => h.rivalCount);
   const stall = useStore(hud, (h) => h.stall);
-  const count = useStore(hud, (h) => h.count);
   const touchId = useRef<string | null>(null);
   const lastX = useRef(0);
   const def = run?.def;
@@ -61,7 +58,6 @@ export function PlayScreen() {
   };
 
   const tutorial = def?.tutorial ?? false;
-  const tutHint = tutorial && phase === 'running' ? (progress < 0.16 ? t('tutGate') : progress > 0.5 && progress < 0.66 ? t('tutObstacle') : null) : null;
   const challenge = def?.challenge;
 
   return (
@@ -90,18 +86,9 @@ export function PlayScreen() {
             </Txt>
             <MaterialCommunityIcons name="toilet" size={20} color="#fff" />
           </View>
-          <ProgressBar value={progress} color={world?.colors.ui[0] ?? colors.primary} height={14} track="rgba(20,26,60,0.45)" />
+          <HudProgress color={world?.colors.ui[0] ?? colors.primary} />
         </View>
-        <View style={s.collect} pointerEvents="none">
-          <CoinIcon size={18} />
-          <Txt display size={16} color="#fff" style={{ marginLeft: 4 }}>{coins}</Txt>
-          {keys > 0 ? (
-            <>
-              <KeyIcon size={18} />
-              <Txt display size={16} color="#fff">{keys}</Txt>
-            </>
-          ) : null}
-        </View>
+        <HudCollect />
       </View>
 
       {/* Ready state: level card, challenge, new mechanics, drag hint */}
@@ -148,22 +135,9 @@ export function PlayScreen() {
       ) : null}
       {phase === 'ready' && !modal ? <DragHint /> : null}
 
-      {tutHint ? (
-        <View style={[s.tutBubble, { top: insets.top + 90 }]} pointerEvents="none">
-          <Txt display size={20} color={colors.ink} align="center">{tutHint}</Txt>
-        </View>
-      ) : null}
+      {tutorial ? <TutorialHint /> : null}
 
-      {phase === 'battle' ? (
-        <View style={[s.center, { top: '22%' }]} pointerEvents="none">
-          <Txt display size={44} color={colors.danger} outline style={{ textShadowColor: '#fff' }}>{t('fight')}</Txt>
-          <View style={kit.row}>
-            <Txt display size={28} color="#fff" outline>{formatCount(count)}</Txt>
-            <Txt display size={20} color={colors.gold} outline style={{ marginHorizontal: 10 }}>VS</Txt>
-            <Txt display size={28} color={colors.danger} outline>{formatCount(rival)}</Txt>
-          </View>
-        </View>
-      ) : null}
+      {phase === 'battle' ? <BattleBanner /> : null}
 
       {(phase === 'finish' || phase === 'won') && stall > 0 ? (
         <View style={[s.center, { top: '18%' }]} pointerEvents="none">
@@ -172,6 +146,55 @@ export function PlayScreen() {
           </Txt>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function HudProgress({ color }: { color: string }) {
+  // Quantized: the bar moves by whole pixels anyway.
+  const progress = useStore(hud, (h) => Math.round(h.progress * 250) / 250);
+  return <ProgressBar value={progress} color={color} height={14} track="rgba(20,26,60,0.45)" />;
+}
+
+function HudCollect() {
+  const coins = useStore(hud, (h) => h.coins);
+  const keys = useStore(hud, (h) => h.keys);
+  return (
+    <View style={s.collect} pointerEvents="none">
+      <CoinIcon size={18} />
+      <Txt display size={16} color="#fff" style={{ marginLeft: 4 }}>{coins}</Txt>
+      {keys > 0 ? (
+        <>
+          <KeyIcon size={18} />
+          <Txt display size={16} color="#fff">{keys}</Txt>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function TutorialHint() {
+  const insets = useSafeAreaInsets();
+  const hint = useStore(hud, (h) => (h.phase !== 'running' ? null : h.progress < 0.16 ? 'tutGate' : h.progress > 0.5 && h.progress < 0.66 ? 'tutObstacle' : null));
+  if (!hint) return null;
+  return (
+    <View style={[s.tutBubble, { top: insets.top + 90 }]} pointerEvents="none">
+      <Txt display size={20} color={colors.ink} align="center">{t(hint)}</Txt>
+    </View>
+  );
+}
+
+function BattleBanner() {
+  const count = useStore(hud, (h) => h.count);
+  const rival = useStore(hud, (h) => h.rivalCount);
+  return (
+    <View style={[s.center, { top: '22%' }]} pointerEvents="none">
+      <Txt display size={44} color={colors.danger} outline style={{ textShadowColor: '#fff' }}>{t('fight')}</Txt>
+      <View style={kit.row}>
+        <Txt display size={28} color="#fff" outline>{formatCount(count)}</Txt>
+        <Txt display size={20} color={colors.gold} outline style={{ marginHorizontal: 10 }}>VS</Txt>
+        <Txt display size={28} color={colors.danger} outline>{formatCount(rival)}</Txt>
+      </View>
     </View>
   );
 }

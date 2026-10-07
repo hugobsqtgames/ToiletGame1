@@ -37,7 +37,8 @@ export function difficultyFor(level: number, mutators: MutatorId[] = []): Diffic
   // Unbounded slow term: grows like log10 after level 150.
   const pressure = L > 150 ? Math.log10(L / 150) : 0;
 
-  let speed = 8.6 + 3.2 * saturate(x, 90) + 0.4 * Math.min(1, pressure);
+  // Playtest: 8.6 m/s at level 1 felt sluggish; runs start brisk and ramp less.
+  let speed = 10.4 + 2.7 * saturate(x, 90) + 0.4 * Math.min(1, pressure);
   if (mutators.includes('rushHour')) speed *= 1.1;
 
   const duration = L === 1 ? 24 : 30 + 13 * saturate(x, 140);

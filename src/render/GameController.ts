@@ -34,6 +34,8 @@ export interface ControllerCallbacks {
 export type QualityTier = 'low' | 'medium' | 'high';
 
 const STEER_RANGE = TRACK.width * 1.25; // meters for a full-screen-width drag
+/** Camera far plane: just past the fog end (150 m) and the shrunken sky (≤ 165 m, LevelView SKY_SCALE). */
+const VIEW_DISTANCE = 190;
 
 export class GameController {
   private scene: THREE.Scene | null = null;
@@ -56,12 +58,15 @@ export class GameController {
   private endInfo: { kind: EndKind; multiplier: number; stallIndex: number; finishCount: number; perfect: boolean } | null = null;
   private hudTimer = 0;
   private battleSfx = 0;
+  private rivalFlyers = 0;
+  private lastRivalFlyT = -1;
   private skin: SkinDef | null = null;
   private callbacks: ControllerCallbacks | null = null;
   private pendingLevel: { def: LevelDef; bonus: number } | null = null;
   private camMode: CamMode = 'menu';
   private showcaseTime = 0;
   private lastCount = -1;
+  private lastCountT = 0;
   private runCoins = 0;
   private runKeys = 0;
   private tutorial = false;
@@ -117,7 +122,8 @@ export class GameController {
     this.scene = scene;
     this.camera = camera;
     camera.near = 0.1;
-    camera.far = 420;
+    camera.far = VIEW_DISTANCE;
+    camera.updateProjectionMatrix();
     this.rig = new CameraRig(camera);
     this.rig.setAspect(aspect);
     this.rig.mode = this.camMode;
@@ -187,6 +193,8 @@ export class GameController {
     this.crowd.setFacing(0, true);
     this.crowd.position.set(0, 0, 0);
     this.fx.reset();
+    audio.loop('brawl', false);
+    this.lastRivalFlyT = -1;
     this.acc = 0;
     this.endTimer = -1;
     this.endInfo = null;
@@ -327,8 +335,10 @@ export class GameController {
     if (this.chest.visible) this.chest.update(dt, this.camera);
 
     // Count bubble above the crowd.
-    if (s.count !== this.lastCount) {
+    // Updated at most ~12×/s while a battle drains the count every step.
+    if (s.count !== this.lastCount && (s.phase !== 'battle' || s.t - this.lastCountT >= 0.08)) {
       this.lastCount = s.count;
+      this.lastCountT = s.t;
       const txt = formatCount(s.count);
       this.countLabel.setText(txt);
       this.countPill.setWidth(Math.max(0.9, this.countLabel.width + 0.45));
@@ -340,12 +350,14 @@ export class GameController {
 
     this.rig.update(s.x, s.phase === 'won' || s.phase === 'finish' ? Math.max(s.z, stallZ(sim.level, 0) - 6) : s.z, sim.radius, dt);
 
-    // Battle crunch sound loop.
-    if (s.phase === 'battle' && !this.paused) {
+    // Battle: one looping brawl sound (a native play per hit was too costly on
+    // iOS), plus rumble + camera shake beats.
+    const fighting = s.phase === 'battle' && !this.paused && !this.debugFreeze;
+    audio.loop('brawl', fighting);
+    if (fighting) {
       this.battleSfx -= dt;
       if (this.battleSfx <= 0) {
-        this.battleSfx = 0.28;
-        audio.play('battle');
+        this.battleSfx = 0.3;
         haptics.light();
         this.rig.shake(0.08);
       }
@@ -404,17 +416,26 @@ export class GameController {
         break;
       }
       case 'loss': {
+        if (e.cause === 'rival') {
+          // Battles lose members every step: a couple of flyers per beat is plenty.
+          this.rivalFlyers += Math.min(2, e.points.length);
+          if (this.rivalFlyers > 0 && s.t - this.lastRivalFlyT >= 0.07) {
+            this.lastRivalFlyT = s.t;
+            const n = Math.min(3, this.rivalFlyers, e.points.length);
+            this.rivalFlyers = 0;
+            for (let i = 0; i < n; i++) this.fx.knockout(e.points[i].x, -e.points[i].z, Math.sign(e.points[i].x - s.x), 0.6);
+          }
+          break;
+        }
         const n = Math.min(e.points.length, 10);
         for (let i = 0; i < n; i++) {
           const p = e.points[i];
-          this.fx.knockout(p.x, -p.z, Math.sign(p.x - s.x), e.cause === 'rival' ? 0.6 : 1);
+          this.fx.knockout(p.x, -p.z, Math.sign(p.x - s.x), 1);
         }
-        if (e.cause !== 'rival') {
-          if (n > 0) this.fx.burst(e.points[0].x, 0.4, -e.points[0].z, 8, ['#FFFFFF', '#DDE3EA'], { speed: 2.5, up: 2.5, size: 0.18 });
-          audio.play(e.cause === 'puddle' ? 'pop' : 'splat', 0.9 + Math.random() * 0.2);
-          rig.shake(Math.min(0.35, 0.06 + e.amount * 0.01));
-          haptics.light();
-        } else audio.play('pop', 1 + Math.random() * 0.3);
+        if (n > 0) this.fx.burst(e.points[0].x, 0.4, -e.points[0].z, 8, ['#FFFFFF', '#DDE3EA'], { speed: 2.5, up: 2.5, size: 0.18 });
+        audio.play(e.cause === 'puddle' ? 'pop' : 'splat');
+        rig.shake(Math.min(0.35, 0.06 + e.amount * 0.01));
+        haptics.light();
         break;
       }
       case 'gain':
@@ -428,7 +449,7 @@ export class GameController {
         lvl.hidePickup(e.id);
         this.runCoins += e.amount;
         this.fx.burst(e.x, 0.6, -e.z, 6, ['#FFC83D', '#FFF3B0'], { speed: 2.5, up: 4, size: 0.1 });
-        audio.play('coin', 1 + (this.runCoins % 5) * 0.05);
+        audio.play('coin');
         hud.set({ coins: this.runCoins });
         break;
       case 'key':

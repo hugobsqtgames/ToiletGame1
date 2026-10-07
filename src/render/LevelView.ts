@@ -39,6 +39,14 @@ interface GateVisual {
   anim: number;
 }
 
+/**
+ * The sky (dome r=300, clouds, stars, moon) follows the camera, so shrinking it
+ * around the camera changes nothing on screen but lets the camera far plane
+ * stop just past the fog: everything farther is invisible anyway, and every
+ * object that is not drawn saves JS time on iOS. See VIEW_DISTANCE.
+ */
+const SKY_SCALE = 0.55;
+
 interface Dyn {
   update(t: number, sim: Simulation, dt: number): void;
 }
@@ -48,7 +56,7 @@ export class LevelView extends THREE.Group {
   readonly colors: ThemeColors;
   private dyn: Dyn[] = [];
   private gates: GateVisual[] = [];
-  private rivals = new Map<number, { view: CrowdView; label: TextLabel; pill: Pill; lastCount: number }>();
+  private rivals = new Map<number, { view: CrowdView; label: TextLabel; pill: Pill; lastCount: number; lastT: number }>();
   private pickups = new Map<number, THREE.Object3D>();
   private coinMesh: THREE.InstancedMesh | null = null;
   private coinIds: number[] = [];
@@ -69,6 +77,7 @@ export class LevelView extends THREE.Group {
     this.labelMat = textMaterial('#FFFFFF');
     this.darkLabelMat = textMaterial('#2B3566');
     this.sky = skyDome(this.colors.skyTop, this.colors.skyBottom);
+    this.sky.scale.setScalar(SKY_SCALE);
     this.add(this.sky);
 
     const statics: Part[] = [];
@@ -92,6 +101,7 @@ export class LevelView extends THREE.Group {
     });
     this.add(env.group);
     this.skyExtras = env.sky;
+    env.sky.scale.setScalar(SKY_SCALE);
     this.add(env.sky);
 
     for (const row of def.gateRows) this.buildGateRow(row);
@@ -224,12 +234,12 @@ export class LevelView extends THREE.Group {
       const mesh = new THREE.Mesh(B(w - 0.18, 2.3, 0.12), mat);
       mesh.position.set(cx, 1.25, 0);
       group.add(mesh);
-      const label = new TextLabel(this.labelMat, 1.0, 5);
+      const label = new TextLabel(this.labelMat, 1.0, 0, 'center', true);
       label.position.set(cx, 1.45, 0.12);
       group.add(label);
       let small: TextLabel | undefined;
       if (g.op.kind === 'cond') {
-        small = new TextLabel(this.labelMat, 0.36, 10);
+        small = new TextLabel(this.labelMat, 0.36, 0, 'center', true);
         small.position.set(cx, 0.55, 0.12);
         group.add(small);
       }
@@ -529,7 +539,7 @@ export class LevelView extends THREE.Group {
       label.setText(formatCount(r.count));
       pill.setWidth(Math.max(0.8, label.width + 0.4));
       this.add(pill, label);
-      this.rivals.set(r.id, { view, label, pill, lastCount: r.count });
+      this.rivals.set(r.id, { view, label, pill, lastCount: r.count, lastT: -1 });
     }
   }
 
@@ -600,8 +610,9 @@ export class LevelView extends THREE.Group {
       v.view.mode = sim.s.phase === 'battle' && sim.s.rivals[sim.s.activeRival] === rs ? 'fight' : rs.charging ? 'run' : 'idle';
       const m = alive ? Math.min(220, rs.count) : 0;
       v.view.update(m, null, dt, t);
-      if (rs.count !== v.lastCount) {
+      if (rs.count !== v.lastCount && t - v.lastT >= 0.08) {
         v.lastCount = rs.count;
+        v.lastT = t;
         v.label.setText(formatCount(rs.count));
         v.pill.setWidth(Math.max(0.8, v.label.width + 0.4));
       }

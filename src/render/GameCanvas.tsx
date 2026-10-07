@@ -32,7 +32,7 @@ export function GameCanvas({ active, dpr }: { active: boolean; dpr: number }) {
         frameloop={active ? 'always' : 'never'}
         dpr={dpr}
         gl={{ antialias: dpr < 2, powerPreference: 'high-performance' }}
-        camera={{ fov: 55, near: 0.1, far: 420, position: [3, 3, -6] }}
+        camera={{ fov: 55, near: 0.1, far: 190, position: [3, 3, -6] }}
         flat
       >
         <SceneBridge />
