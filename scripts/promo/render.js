@@ -33,13 +33,18 @@ function prepareStage() {
   fs.copyFileSync(path.join(g, 'nunito/900Black/Nunito_900Black.ttf'), path.join(STAGE, 'fonts/Nunito_900Black.ttf'));
   fs.copyFileSync(path.join(g, 'nunito/800ExtraBold/Nunito_800ExtraBold.ttf'), path.join(STAGE, 'fonts/Nunito_800ExtraBold.ttf'));
   fs.copyFileSync(path.join(ROOT, 'assets/icon.png'), path.join(STAGE, 'img/icon.png'));
-  fs.symlinkSync(path.join(WORK, 'clips'), path.join(STAGE, 'clips'));
 }
 
-function loadMeta() {
+/** Footage of the app in the film's language (clips-fr/ = the app running in French), else English. */
+function clipDir(lang) {
+  const d = path.join(WORK, `clips-${lang}`);
+  return lang !== 'en' && fs.existsSync(d) ? d : path.join(WORK, 'clips');
+}
+
+function loadMeta(lang) {
   const meta = {};
-  for (const name of fs.readdirSync(path.join(WORK, 'clips'))) {
-    const f = path.join(WORK, 'clips', name, 'meta.json');
+  for (const name of fs.readdirSync(clipDir(lang))) {
+    const f = path.join(clipDir(lang), name, 'meta.json');
     if (fs.existsSync(f)) meta[name] = JSON.parse(fs.readFileSync(f, 'utf8'));
   }
   return meta;
@@ -202,7 +207,12 @@ function designSfx(S, BEAT) {
   return out;
 }
 
-async function renderLang(browser, port, lang, meta) {
+async function renderLang(browser, port, lang) {
+  const link = path.join(STAGE, 'clips');
+  fs.rmSync(link, { force: true });
+  fs.symlinkSync(clipDir(lang), link);
+  const meta = loadMeta(lang);
+  console.log(`${lang}: footage from ${path.relative(ROOT, clipDir(lang))}`);
   const worlds = JSON.parse(execFileSync(path.join(ROOT, 'node_modules/.bin/tsx'), [path.join(__dirname, 'worlds.ts'), lang], { encoding: 'utf8' }));
   const scale = PREVIEW ? 0.5 : 1;
   const page = await browser.newPage({ viewport: { width: 886, height: 1920 }, deviceScaleFactor: scale });
@@ -245,11 +255,10 @@ async function renderLang(browser, port, lang, meta) {
   const arg = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'all';
   const langs = arg === 'all' ? ['en', 'fr'] : arg.split(',');
   prepareStage();
-  const meta = loadMeta();
   const server = http.createServer((req, res) => handler(req, res, { public: STAGE, symlinks: true, cleanUrls: false }));
   await new Promise((r) => server.listen(0, r));
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
-  for (const lang of langs) await renderLang(browser, server.address().port, lang, meta);
+  for (const lang of langs) await renderLang(browser, server.address().port, lang);
   await browser.close();
   server.close();
 })();

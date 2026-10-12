@@ -25,7 +25,9 @@ for p in "home LEVEL=25" "l86 LEVEL=86 START=2" "l45 LEVEL=45 SKIN=robot" "daily
 done
 # 3. film the clips (≈ 25 min with software GL; clips can run in parallel processes)
 node scripts/promo/capture.js all
-# 4. render EN + FR (≈ 5 min each)
+# 3b. the French app for the French film (device language fr-FR → .promo/clips-fr/)
+PROMO_LANG=fr node scripts/promo/capture.js all
+# 4. render EN + FR (≈ 5 min each; FR uses clips-fr/ when present)
 node scripts/promo/render.js all          # --preview: fast low-res draft
 ```
 

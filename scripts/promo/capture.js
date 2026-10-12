@@ -17,12 +17,15 @@ const WORK = process.env.PROMO_WORK || path.join(ROOT, '.promo');
 const WEB = process.env.PROMO_WEB || path.join(WORK, 'web');
 const FPS = 30;
 const VIEW = { width: 443, height: 960 }; // ×2 = 886×1920 (App Store 6.9" preview size)
+/** App language = device language (setting "auto"): PROMO_LANG=fr films the French app into clips-fr/. */
+const LANG = process.env.PROMO_LANG || 'en';
+const CLIPDIR = LANG === 'en' ? 'clips' : `clips-${LANG}`;
 
 async function filmClip(browser, port, name, clip) {
-  const out = path.join(WORK, 'clips', name);
+  const out = path.join(WORK, CLIPDIR, name);
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
-  const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: 2 });
+  const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: 2, locale: LANG === 'fr' ? 'fr-FR' : 'en-US' });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   if (clip.save) {
