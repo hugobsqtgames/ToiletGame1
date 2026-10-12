@@ -3,7 +3,7 @@
  * (taps on real buttons, steering through the game controller). Saves come from
  * scripts/make-save.ts (see README). Times are virtual seconds at 30 fps.
  */
-const CLOSE = `document.querySelectorAll('[aria-label=Close]').forEach((e) => e.click())`;
+const CLOSE = `document.querySelectorAll('[aria-label=Close],[aria-label=Fermer]').forEach((e) => e.click())`; // EN + FR app
 const AUTO = `__game.autoplay = true;`;
 const ff = (pred, steer = 'undefined', max = 90) =>
   `(() => { const g = __game; let t = 0; while (t < ${max} && !(${pred})(g.sim) && !g.sim.finished) { g.debugFastForward(0.05, ${steer}); t += 0.05; } return t; })()`;
