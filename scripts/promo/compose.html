@@ -4,7 +4,7 @@
   LOO RUSH — App Store preview compositor.
   Rendered frame by frame by scripts/promo/render.js: window.renderAt(t) lays out
   every layer for time t (seconds), then the page is screenshotted.
-  Timeline is locked to the game's own music (music_game: 128 BPM, bar = 1.875 s).
+  Timeline is locked to the game's own soundtrack (music_surf: 134 BPM, bar = 1.791 s, 16 bars).
 -->
 <style>
 @font-face { font-family: Lilita; src: url(fonts/LilitaOne_400Regular.ttf); }
@@ -68,8 +68,8 @@ html, body { width: 886px; height: 1920px; overflow: hidden; background: #121735
 const Q = new URLSearchParams(location.search);
 const LANG = Q.get('lang') || 'en';
 const W = 886, H = 1920;
-const BPM = 128, BEAT = 60 / BPM, BAR = BEAT * 4;
-const DURATION = 899 / 30; // 29.97 s: two loops of the game music, under the 30 s App Store limit
+const BPM = 134, BEAT = 60 / BPM, BAR = BEAT * 4;
+const DURATION = 860 / 30; // 28.67 s = 16 bars of the game's surf track (App Store limit: 15–30 s)
 
 /* ---------------- copy (EN / FR). Lines marked * come straight from the app. ---------------- */
 const TXT = {
@@ -287,7 +287,7 @@ function setup() {
     won: phaseFrame(h, 'won', markFrame(h, 'finish')),
     homeTap: markFrame('home', 'tap-play'),
     golden: markFrame('meta', 'golden'),
-    open: markFrame('meta', 'open'),
+    chestTap: markFrame('chestEpic', 'tap'),
   };
   return clips;
 }
@@ -469,20 +469,20 @@ function renderScene(t) {
     head(TXT.worlds2, t, S.worlds + 0.35 + 4 * BEAT, S.meta - 0.15, { y: 290, size: 84, color: '#ffc83d' });
   }
 
-  /* 9 · META — skins (live 3D preview) then the epic chest. */
+  /* 9 · META — skins (live 3D preview) then the real 3D epic chest: charge, burst, rewards. */
   if (t >= S.meta - 0.1 && t < S.cta + 0.6) {
     const local = t - S.meta;
     const inA = eOut5(prog(t, S.meta - 0.1, S.meta + 0.55));
     const inB = eOut5(prog(t, S.meta + 4 * BEAT - 0.25, S.meta + 4 * BEAT + 0.4));
     const exit = eInOut5(prog(t, S.cta - 0.15, S.cta + 0.5));
     const fA = C.golden - 4 + Math.max(0, local) * 30;
-    const fB = C.open - 2 + Math.max(0, local - 4 * BEAT + 0.25) * 30;
+    const fB = C.chestTap - 6 + Math.max(0, local - 4 * BEAT + 0.25) * 30;
     dev(1, {
       d: 1, h: lerp(1330, 1150, inB), x: lerp(W * 1.3, lerp(W / 2, W * 0.3, inB), inA), y: lerp(1180, 1150, inB) + exit * 1100,
       ry: lerp(-14, 10, inB), rx: 4, rz: lerp(3, -2, inB), src: frameOf('meta', fA), z: 1, opacity: 1 - inB * 0.15,
     });
     if (inB > 0) dev(2, {
-      d: 1, h: 1180, x: lerp(W * 1.35, W * 0.7, inB), y: 1230 + exit * 1100, ry: -10, rx: 4, rz: 2, src: frameOf('meta', fB), z: 2,
+      d: 1, h: 1180, x: lerp(W * 1.35, W * 0.7, inB), y: 1230 + exit * 1100, ry: -10, rx: 4, rz: 2, src: frameOf('chestEpic', fB), z: 2,
     });
     head(TXT.skins, t, S.meta + 0.2, S.meta + 4 * BEAT - 0.25, { y: 170, size: 104 });
     head(TXT.chests, t, S.meta + 4 * BEAT, S.cta - 0.2, { y: 190, size: 104 });

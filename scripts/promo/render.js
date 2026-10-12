@@ -16,7 +16,10 @@ const WORK = process.env.PROMO_WORK || path.join(ROOT, '.promo');
 const STAGE = path.join(WORK, 'stage');
 const OUTDIR = path.join(ROOT, 'docs', 'preview');
 const FPS = 30;
-const FRAMES = 899; // 29.97 s
+const FRAMES = 860; // 28.67 s = 16 bars at 134 BPM
+const BPM = 134;
+/** Music bed: the game's own surf track, from its 4th bar (the full band comes in on the hook). */
+const MUSIC = { file: path.join(ROOT, '.music-work', 'music_surf.wav'), fromBar: 3 };
 const PREVIEW = process.argv.includes('--preview');
 const SR = 44100;
 
@@ -54,12 +57,15 @@ function readWav(file) {
   }
   const n = data.length / 2 / ch;
   const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) out[i] = data.readInt16LE(i * 2 * ch) / 32768;
-  return { rate, s: out };
+  const right = ch > 1 ? new Float32Array(n) : out;
+  for (let i = 0; i < n; i++) {
+    out[i] = data.readInt16LE(i * 2 * ch) / 32768;
+    if (ch > 1) right[i] = data.readInt16LE(i * 2 * ch + 2) / 32768;
+  }
+  return { rate, s: out, r: right };
 }
 const wavCache = {};
-// The promo is cut on the original 128 BPM loop kept in scripts/promo/audio; SFX come from the game.
-const wav = (id) => (wavCache[id] ??= readWav(fs.existsSync(path.join(__dirname, 'audio', id + '.wav')) ? path.join(__dirname, 'audio', id + '.wav') : path.join(ROOT, 'assets/audio', id + '.wav')));
+const wav = (id) => (wavCache[id] ??= readWav(path.join(ROOT, 'assets/audio', id + '.wav')));
 
 function writeWav(file, L, R) {
   const n = L.length;
@@ -75,7 +81,7 @@ function writeWav(file, L, R) {
 }
 
 /** Adds a sound at time t (s); pan -1..1; optional one-pole low-pass (Hz). */
-function place(L, R, id, t, vol, pan = 0, rate = 1) {
+function place(L, R, id, t, vol, pan = 0, rate = 1, dur = Infinity) {
   const w = wav(id);
   const step = (w.rate / SR) * rate;
   const start = Math.round(t * SR);
@@ -84,7 +90,10 @@ function place(L, R, id, t, vol, pan = 0, rate = 1) {
     const src = i * step;
     const k = Math.floor(src);
     if (k + 1 >= w.s.length) break;
-    const v = w.s[k] + (w.s[k + 1] - w.s[k]) * (src - k);
+    const tt = i / SR;
+    if (tt >= dur) break;
+    const fade = Math.min(1, (dur - tt) / 0.04);
+    const v = (w.s[k] + (w.s[k + 1] - w.s[k]) * (src - k)) * fade;
     const j = start + i;
     if (j < 0) continue;
     if (j >= L.length) break;
@@ -96,26 +105,31 @@ function place(L, R, id, t, vol, pan = 0, rate = 1) {
 function mix(sfx, scenes, outFile) {
   const n = Math.round((FRAMES / FPS) * SR);
   const L = new Float32Array(n), R = new Float32Array(n);
-  // Music bed: the game's own track (128 BPM, 15 s), twice. First bar muffled (the "problem"),
-  // opens on the hook.
-  const m = wav('music_game');
+  // Music bed: the game's own surf track (raw render, no AAC priming offset, so bars land
+  // exactly on the cuts). First bar muffled (the "problem"), opens on the hook.
+  if (!fs.existsSync(MUSIC.file)) execFileSync('node', [path.join(ROOT, 'scripts/gen-music.js'), 'surf'], { stdio: 'inherit' });
+  const m = readWav(MUSIC.file);
   const mStep = m.rate / SR;
-  let lp = 0;
-  const bar = 4 * 60 / 128;
+  const bar = (4 * 60) / BPM;
+  const from = MUSIC.fromBar * bar * m.rate;
+  let lpL = 0, lpR = 0;
   for (let j = 0; j < n; j++) {
-    const src = (j * mStep) % m.s.length;
+    const src = from + j * mStep;
     const k = Math.floor(src);
-    const v = m.s[k] + ((m.s[(k + 1) % m.s.length] ?? 0) - m.s[k]) * (src - k);
+    const f = src - k;
+    const vl = m.s[k] + ((m.s[k + 1] ?? 0) - m.s[k]) * f;
+    const vr = m.r[k] + ((m.r[k + 1] ?? 0) - m.r[k]) * f;
     const t = j / SR;
     const open = Math.min(1, Math.max(0, (t - (bar - 0.08)) / 0.08));
     const a = 0.09 + open * 0.91; // one-pole low-pass ≈ 650 Hz → full range
-    lp += (v - lp) * a;
-    const fadeOut = Math.min(1, (FRAMES / FPS - t) / 0.12);
-    const g = (0.58 + open * 0.17) * fadeOut;
-    L[j] += lp * g;
-    R[j] += lp * g;
+    lpL += (vl - lpL) * a;
+    lpR += (vr - lpR) * a;
+    const fadeOut = Math.min(1, (FRAMES / FPS - t) / 0.35);
+    const g = (0.62 + open * 0.2) * fadeOut;
+    L[j] += lpL * g;
+    R[j] += lpR * g;
   }
-  for (const s of sfx) place(L, R, s.id, s.t, s.vol, s.pan ?? 0, s.rate ?? 1);
+  for (const s of sfx) place(L, R, s.id, s.t, s.vol, s.pan ?? 0, s.rate ?? 1, s.dur ?? Infinity);
   // Gentle limiter (tanh soft clip) keeps the punch without distortion.
   let peak = 0;
   for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
@@ -128,7 +142,7 @@ function mix(sfx, scenes, outFile) {
 function gameSfx(meta, vis) {
   const out = [];
   const lastCoin = { t: -1 };
-  const SKIP = /^(music_|whoosh)/;
+  const SKIP = /^(music_|whoosh|brawl)/;
   for (let i = 1; i < vis.length; i++) {
     for (const src of new Set(vis[i])) {
       const m = /clips\/([^/]+)\/(\d+)\.jpg/.exec(src);
@@ -148,6 +162,21 @@ function gameSfx(meta, vis) {
         if (id === 'coin') { if (at - lastCoin.t < 0.12) continue; lastCoin.t = at; }
         out.push({ id, t: at, vol: (s.vol ?? 0.8) * (id === 'coin' ? 0.55 : 1), rate: s.rate ?? 1 });
       }
+    }
+  }
+  // The battle brawl is ONE looping sound in the game: lay it under every stretch of
+  // edited time that shows a battle on screen.
+  let start = -1;
+  for (let i = 0; i <= vis.length; i++) {
+    const fighting = i < vis.length && (vis[i] ?? []).some((src) => {
+      const m = /clips\/([^/]+)\/(\d+)\.jpg/.exec(src);
+      return m && meta[m[1]]?.states?.[Number(m[2]) - 1]?.[1] === 'battle';
+    });
+    if (fighting && start < 0) start = i;
+    if (!fighting && start >= 0) {
+      const a = start / FPS, b = i / FPS;
+      for (let t = a; t < b - 0.05; t += 1.6) out.push({ id: 'brawl', t, vol: 0.5, dur: Math.min(1.6, b - t) });
+      start = -1;
     }
   }
   return out;
@@ -198,7 +227,7 @@ async function renderLang(browser, port, lang, meta) {
   const out = path.join(PREVIEW ? WORK : OUTDIR, name + '.mp4');
   const audio = path.join(WORK, `mix-${lang}.wav`);
   const visFull = PREVIEW ? null : vis;
-  mix(visFull ? [...gameSfx(meta, visFull), ...designSfx(S, 60 / 128)] : designSfx(S, 60 / 128), S, audio);
+  mix(visFull ? [...gameSfx(meta, visFull), ...designSfx(S, 60 / BPM)] : designSfx(S, 60 / BPM), S, audio);
   execFileSync('ffmpeg', [
     '-v', 'error', '-y', '-framerate', String(FPS / step), '-i', path.join(frameDir, '%05d.jpg'), '-i', audio,
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-profile:v', 'high', '-level', '4.2', '-pix_fmt', 'yuv420p', '-r', String(FPS),

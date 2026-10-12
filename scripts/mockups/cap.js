@@ -36,8 +36,14 @@ function scenarios(page, shot, tid, wait, ev, freezeShot) {
       await tid('skin-golden'); await wait(2600); await shot('24_skins');
       await ev('closeAll()'); await wait(900);
       await tid('btn-chest'); await wait(1200); await shot('25a_chests');
-      await tid('open-epic'); await wait(500); await shot('25b_chest_opening'); await wait(2600); await shot('25_chests');
-      await tid('btn-chest-ok'); await wait(600); await ev('closeAll()'); await wait(700);
+      // 3D chest stage: it drops and lands ("tap!"), then charges, bursts open and reveals the rewards.
+      // Software GL runs the game slower than real time, so wait on the app's own state, not on fixed delays.
+      await tid('open-epic'); await page.getByTestId('chest-tap').first().waitFor({ timeout: 20000 }).catch(() => {});
+      await ev(`new Promise((r) => { const t0 = performance.now(); (function f() { if (__game.chest.phase === 'idle' || performance.now() - t0 > 20000) r(); else setTimeout(f, 100); })(); })`);
+      await wait(900); await shot('25b_chest_opening');
+      await tid('chest-tap'); await page.getByTestId('btn-chest-ok').first().waitFor({ timeout: 30000 }).catch(() => {});
+      await wait(1800); await shot('25_chests');
+      await tid('btn-chest-ok'); await wait(900); await ev('closeAll()'); await wait(700);
       await tid('btn-settings'); await wait(1300); await shot('26_settings');
     },
     async run25() {
