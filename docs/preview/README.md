@@ -3,7 +3,7 @@
 | File | |
 |---|---|
 | `loo-rush-preview-en.mp4` | English preview — 886×1920, 30 fps, H.264 + AAC, 28.67 s |
-| `loo-rush-preview-fr.mp4` | French preview (same edit, French titles and app copy) |
+| `loo-rush-preview-fr.mp4` | French preview (same edit, French titles, and the app itself filmed in French) |
 | `poster-en.jpg`, `poster-fr.jpg` | Poster frame (brand lockup) |
 | `storyboard-en.jpg` | One frame per second of the English film |
 
